@@ -15,6 +15,14 @@ struct ClipRowView: View {
                 .frame(width: 16)
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if item.isTranslation {
+                Text("translated")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+            }
             if let appIcon {
                 Image(nsImage: appIcon)
                     .resizable()
@@ -54,6 +62,39 @@ struct ClipRowView: View {
         case .image: "photo"
         case .file: "doc"
         }
+    }
+}
+
+/// The ⌘T result under a row: progress, the translation, or why it failed.
+struct RowTranslationView: View {
+    let state: RowTranslation.State
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "character.bubble")
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            switch state {
+            case .working:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Translating…").foregroundStyle(.secondary)
+                }
+            case .done(let text):
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(text).lineLimit(4)
+                    Text("↩ paste translation · ⌘C copy it")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            case .failed(let message):
+                Text(message).foregroundStyle(.red)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 14)
+        .padding(.trailing, 14)
+        .padding(.vertical, 6)
     }
 }
 

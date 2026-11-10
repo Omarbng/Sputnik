@@ -1,12 +1,15 @@
 import Carbon.HIToolbox
 import CoreGraphics
 
+/// Synthetic keystrokes, sent by virtual key code (`kVK_ANSI_*`), not by character, so they
+/// also work while the Russian (or any other) keyboard layout is active. They need the
+/// Accessibility permission.
 enum KeySender {
-    /// Sends ⌘V by virtual key code (`kVK_ANSI_V`), not by character, so it also works while
-    /// the Russian (or any other) keyboard layout is active. Needs Accessibility permission.
-    static func commandV() {
+    static func commandV() { command(CGKeyCode(kVK_ANSI_V)) }
+    static func commandC() { command(CGKeyCode(kVK_ANSI_C)) }
+
+    private static func command(_ key: CGKeyCode) {
         let source = CGEventSource(stateID: .combinedSessionState)
-        let key = CGKeyCode(kVK_ANSI_V)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
         else { return }

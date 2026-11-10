@@ -10,14 +10,18 @@ import ClipDockCore
 ///   query  {text}                  set the search text
 ///   key    {keyCode, command}      press a key through the popup's keymap
 ///   state                          log the popup state (ids, counts, on-screen check)
+///   translateInPlace               same as ⌥⌘T
+///   translateShowOnly              same as ⇧⌥⌘T
 ///   focused {text}                 log whether the focused text field contains `text`
 ///                                  (a yes/no only; the field's text is never logged)
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
 
-    init(popup: PopupController) {
+    init(popup: PopupController, translation: TranslationService) {
         observe("toggle") { _ in popup.toggle() }
+        observe("translateInPlace") { _ in translation.translateSelectionInPlace() }
+        observe("translateShowOnly") { _ in translation.translateSelectionShowOnly() }
         observe("query") { info in popup.setQuery(info.text ?? "") }
         observe("key") { info in
             guard let keyCode = info.keyCode else { return }
@@ -37,7 +41,8 @@ final class DebugHooks {
                 selectedID=\(model.selectedItem?.id ?? -1, privacy: .public) \
                 ids=\(ids, privacy: .public) \
                 frame=\(NSStringFromRect(popup.frame), privacy: .public) \
-                onScreen=\(popup.isFullyOnScreen, privacy: .public)
+                onScreen=\(popup.isFullyOnScreen, privacy: .public) \
+                translation=\(Self.describe(model.translation), privacy: .public)
                 """)
         }
         observe("focused") { info in
@@ -50,6 +55,16 @@ final class DebugHooks {
                 """)
         }
         Log.app.notice("debug hooks ready")
+    }
+
+    /// State and length only, never the text.
+    private static func describe(_ translation: RowTranslation?) -> String {
+        guard let translation else { return "none" }
+        switch translation.state {
+        case .working: return "working(id=\(translation.itemID))"
+        case .done(let text): return "done(id=\(translation.itemID),chars=\(text.count))"
+        case .failed: return "failed(id=\(translation.itemID))"
+        }
     }
 
     private static func focusedFieldValue() -> String? {

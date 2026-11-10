@@ -51,14 +51,19 @@ struct PopupListView: View {
 
     private func rows(_ items: [ClipItem], selectedID: Int64?) -> some View {
         ForEach(items, id: \.id) { item in
-            ClipRowView(
-                item: item,
-                isSelected: item.id == selectedID,
-                appIcon: icons.icon(for: item.sourceBundleID),
-                thumbnails: thumbnails
-            )
+            VStack(spacing: 0) {
+                ClipRowView(
+                    item: item,
+                    isSelected: item.id == selectedID,
+                    appIcon: icons.icon(for: item.sourceBundleID),
+                    thumbnails: thumbnails
+                )
+                .onTapGesture { model.onPick?(item) }
+                if let translation = model.translation, translation.itemID == item.id {
+                    RowTranslationView(state: translation.state)
+                }
+            }
             .id(item.id ?? -1)
-            .onTapGesture { model.onPick?(item) }
         }
     }
 }

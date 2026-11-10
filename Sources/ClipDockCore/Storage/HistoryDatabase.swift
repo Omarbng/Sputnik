@@ -57,6 +57,7 @@ public final class HistoryDatabase: Sendable {
                 existing.lastUsedAt = now
                 existing.sourceBundleID = clip.sourceBundleID ?? existing.sourceBundleID
                 existing.sourceAppName = clip.sourceAppName ?? existing.sourceAppName
+                existing.isTranslation = existing.isTranslation || clip.isTranslation
                 try existing.update(db)
                 item = existing
                 wasDuplicate = true
@@ -71,7 +72,8 @@ public final class HistoryDatabase: Sendable {
                     sourceAppName: clip.sourceAppName,
                     byteSize: clip.byteSize,
                     createdAt: now,
-                    lastUsedAt: now
+                    lastUsedAt: now,
+                    isTranslation: clip.isTranslation
                 )
                 try new.insert(db)
                 item = new
@@ -149,6 +151,11 @@ public final class HistoryDatabase: Sendable {
                 t.column("createdAt", .datetime).notNull()
                 t.column("lastUsedAt", .datetime).notNull().indexed()
                 t.column("isPinned", .boolean).notNull().defaults(to: false)
+            }
+        }
+        migrator.registerMigration("v2-translation-badge") { db in
+            try db.alter(table: ClipItem.databaseTableName) { t in
+                t.add(column: "isTranslation", .boolean).notNull().defaults(to: false)
             }
         }
         return migrator

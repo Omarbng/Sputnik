@@ -8,12 +8,14 @@ final class ItemActions {
     private let history: HistoryModel
     private let paster: Paster
     private let hud: HUDController
+    private let translation: TranslationService
 
-    init(database: HistoryDatabase, history: HistoryModel, paster: Paster, hud: HUDController) {
+    init(database: HistoryDatabase, history: HistoryModel, paster: Paster, hud: HUDController, translation: TranslationService) {
         self.database = database
         self.history = history
         self.paster = paster
         self.hud = hud
+        self.translation = translation
     }
 
     /// 1. write to the pasteboard (marked internal) 2. close the popup 3–4. wait, send ⌘V.
@@ -34,6 +36,25 @@ final class ItemActions {
         markUsed(item)
         hud.show("Copied")
         Log.paste.notice("copy id=\(item.id ?? -1, privacy: .public)")
+    }
+
+    /// ↩ on a ⌘T translation: paste it, and add it to history with the translated badge.
+    func pasteTranslation(_ text: String, closePopup: () -> Void) {
+        let target = NSWorkspace.shared.frontmostApplication
+        PasteboardWriter.write(text: text)
+        closePopup()
+        translation.record(text, from: target)
+        paster.pasteIntoFrontApp()
+        Log.paste.notice("paste translation chars=\(text.count, privacy: .public)")
+    }
+
+    /// ⌘C on a ⌘T translation.
+    func copyTranslation(_ text: String, closePopup: () -> Void) {
+        let target = NSWorkspace.shared.frontmostApplication
+        PasteboardWriter.write(text: text)
+        closePopup()
+        translation.record(text, from: target)
+        hud.show("Copied")
     }
 
     func delete(_ item: ClipItem) {

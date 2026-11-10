@@ -10,3 +10,12 @@
 
 Before a test sends ⌘V, it must check that the intended app is frontmost. Otherwise the paste lands in
 whatever you're using at that moment.
+
+Running the paste target as an app, so `open` brings it to the front:
+
+```sh
+T=/tmp/CDTarget.app; mkdir -p $T/Contents/MacOS
+swiftc -O -o $T/Contents/MacOS/cdtool Tools/cdtool.swift
+/usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string cdtool" -c "Add :CFBundleIdentifier string com.omar.clipdock.testtarget" -c "Add :CFBundlePackageType string APPL" $T/Contents/Info.plist
+open -n $T --args target /tmp/out.txt --text /tmp/in.txt
+```

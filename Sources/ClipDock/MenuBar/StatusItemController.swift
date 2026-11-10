@@ -7,9 +7,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     struct Actions {
         var isCapturing: () -> Bool
         var canPaste: () -> Bool
+        var needsLanguages: () -> Bool
         var openPopup: () -> Void
         var allowCapture: () -> Void
         var allowPasting: () -> Void
+        var downloadLanguages: () -> Void
     }
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -50,6 +52,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(allow)
             needsSeparator = true
         }
+        if actions.needsLanguages() {
+            let download = item("Download Translation Languages…", #selector(downloadLanguages))
+            download.subtitle = "English and Russian, for offline translation"
+            menu.addItem(download)
+            needsSeparator = true
+        }
         if needsSeparator { menu.addItem(.separator()) }
 
         let open = item("Open ClipDock", #selector(openPopup))
@@ -71,4 +79,5 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func openPopup() { actions.openPopup() }
     @objc private func allowCapture() { actions.allowCapture() }
     @objc private func allowPasting() { actions.allowPasting() }
+    @objc private func downloadLanguages() { actions.downloadLanguages() }
 }

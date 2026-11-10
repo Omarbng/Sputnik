@@ -4,7 +4,8 @@
 - [x] **M0 — Skeleton** (Omar checked it on 2026-11-10)
 - [x] **M1 — Capture** (Claude tested it end to end on 2026-11-10, as Omar asked)
 - [x] **M2 — Popup + paste** (Claude tested it, see "M2 test results"; Omar still needs to press ⌘⇧V himself)
-- [ ] M3 — Translation
+- [x] **M3 — Translation** (works end to end with the stand-in translator. The real Apple
+  engine needs the English and Russian downloads, which Omar must confirm in the macOS prompt)
 - [ ] M4 — Pins, paste all, settings
 - [ ] M5 — UI pass
 - [ ] M6 — Claude translation (optional)
@@ -48,9 +49,14 @@
   cross-import overlays for the test target only, because the CLT lack the
   `_Testing_Foundation` module file.
 - **Deployment target:** macOS 26.0 (`sw_vers` = 26.0).
-- **Translation (for M3):** in SDK 26.2, `TranslationSession(installedSource:target:)` is
-  `@available(macOS 26.0)`, not 26.4 as the brief says. A session can be created directly,
-  without the hidden `.translationTask` view. Confirm with Omar at M3.
+- **Translation engine (M3):** in SDK 26.2, `TranslationSession(installedSource:target:)` is
+  `@available(macOS 26.0)`, not 26.4 as the brief says.
+  - `AppleTranslator` (an actor) creates sessions directly and keeps one warm per direction.
+    A failed session is dropped so the next try starts fresh. There's no hidden
+    `.translationTask` view for translating.
+  - SwiftUI's `.translationTask` is used only by the one-time "Download English and Russian"
+    card, because `prepareTranslation()` needs it to show the system download prompt.
+  - Everything sits behind the `Translator` protocol, ready for the Claude engine in M6.
 - **Capture:**
   - Priority is files, then text or URL, then image. A lone http(s) URL is a `url`. A web
     URL that comes with an image (a browser's "Copy Image") is stored as the image.
@@ -72,6 +78,29 @@
   - It appears on its own once. After that, the menu shows "Capture Off — Allow Clipboard
     Access…" while capture is off.
   - The menu-bar icon is `clipboard` while capture is off and `doc.on.clipboard` while on.
+- **Language detection:** more than 30% Cyrillic letters (U+0400–U+052F) means Russian.
+  Otherwise `NLLanguageRecognizer` gets the final say. Russian goes RU → EN; everything else
+  goes EN → RU. Only the first 2,000 characters are examined.
+- **Long text:** `TextLayout` splits text by line, keeping each line's leading and trailing
+  whitespace, blank lines, and the exact line breaks (including `\r\n`). The lines go to
+  the engine as one batch, then are put back together.
+- **In place (⌥⌘T):**
+  1. Suspend capture and snapshot the whole pasteboard.
+  2. Send ⌘C and wait up to 300 ms for `changeCount` to change.
+  3. Detect the language and translate. If that takes more than 150 ms, show "Translating…".
+  4. Write the translation (marked internal) and send ⌘V.
+  5. After 500 ms, restore the snapshot and resume capture.
+  6. Record the translation in history with `isTranslation`.
+  - The temporary ⌘C copy is never stored.
+  - The translation shortcuts fire on key-up.
+  - Without Accessibility, or with secure input on, it stops with a HUD.
+- **Show only (⇧⌥⌘T):** steps 1–3, restoring the clipboard right away, then a card at the
+  cursor with Copy (⌘C) and Esc. Copy also records the translation in history.
+- **Popup ⌘T:** the translation (or its progress, or an error) appears under the row. ↩ and
+  ⌘C act on the translation while it's shown.
+- **Database migration v2** adds `isTranslation`, shown as a "translated" badge.
+- **Debug:** `CLIPDOCK_FAKE_TRANSLATOR=1` swaps in a stand-in translator that tags each line
+  (`[ru] …`), so the flow can be tested without the language files.
 - **Logging:** `notice` level, so messages are kept and visible in `log show`. They contain
   only ids, kinds, sizes, and skip reasons.
 - Dependencies get added in the milestone that needs them: GRDB 7.12 in M1,
@@ -122,6 +151,19 @@
 - ClipDock's own writes are skipped by capture (`ownWrite`).
 - The Accessibility permission survived several rebuilds, which confirms the stable signing.
 
+## M3 test results (2026-11-10, stand-in translator, CDTarget test app)
+- In place, English, multi-paragraph: replaced with the layout kept, byte for byte, including
+  the blank line, indentation, and trailing newline. The clipboard came back identical (every
+  item and type compared), and undo restored the original.
+- In place, Russian: RU → EN, with the clipboard identical afterwards.
+- Nothing selected: "Select some text first" (`nothingCopied`), with nothing changed.
+- Show only: the card appeared, nothing was replaced, and the clipboard was identical.
+- Popup ⌘T: the translation appeared under the row, and ↩ pasted it into the target app.
+- History: every translation was stored with `isTranslation=1`. The temporary ⌘C copies were
+  not stored.
+- Still to do once the languages are downloaded: the same run with Apple's engine
+  (`MODE=real`), and the brief's TextEdit and Safari checks.
+
 ## Known issues
 - Not tested by Claude:
   - The physical ⌘⇧V press. The script opens the popup through the same `toggle()` call.
@@ -130,6 +172,8 @@
   - What the HUD and popup look like, because screenshots need Screen Recording permission.
 - `NSApp.isActive` reads true while the popup is open, but the frontmost app doesn't change
   (logged before and after each open). Pastes land in the right app.
+- Text is translated line by line, so a sentence hard-wrapped across lines is translated in
+  pieces.
 - Images are pasted as PNG only. Very old apps that read only TIFF won't accept them.
 - The 1Password (`com.1password.1password`, `com.agilebits.onepassword7`) and Bitwarden
   (`com.bitwarden.desktop`) bundle IDs aren't verified, because neither app is installed.

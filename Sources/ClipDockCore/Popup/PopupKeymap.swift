@@ -8,6 +8,8 @@ public enum PopupCommand: Equatable, Sendable {
     case pasteNumber(Int)
     case copySelected
     case deleteSelected
+    /// ⌘T: translate the selected item and show the result under it.
+    case translateSelected
     // Editing in the search field. A menu-bar app has no Edit menu to supply these.
     case selectAllText
     case cutText
@@ -37,6 +39,7 @@ public enum PopupKeymap {
     static let c: UInt16 = 0x08
     static let v: UInt16 = 0x09
     static let x: UInt16 = 0x07
+    static let t: UInt16 = 0x11
     static let digits: [UInt16: Int] = [
         0x12: 1, 0x13: 2, 0x14: 3, 0x15: 4, 0x17: 5, 0x16: 6, 0x1A: 7, 0x1C: 8, 0x19: 9,
     ]
@@ -57,6 +60,7 @@ public enum PopupKeymap {
             switch keyCode {
             case c: return .copySelected
             case delete: return .deleteSelected
+            case t: return .translateSelected
             case a: return .selectAllText
             case x: return .cutText
             case v: return .pasteText

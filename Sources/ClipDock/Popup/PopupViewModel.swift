@@ -1,6 +1,18 @@
 import ClipDockCore
 import Observation
 
+/// A ⌘T translation shown under one row.
+struct RowTranslation: Equatable {
+    enum State: Equatable {
+        case working
+        case done(String)
+        case failed(String)
+    }
+
+    let itemID: Int64
+    var state: State
+}
+
 /// Search text and selection for the popup. Rows come straight from `HistoryModel`.
 @MainActor
 @Observable
@@ -11,6 +23,8 @@ final class PopupViewModel {
     private(set) var selectedIndex = 0
     /// Bumped on every open, so the list can scroll back to the top.
     private(set) var openCount = 0
+    /// The ⌘T result under a row, if any.
+    var translation: RowTranslation?
 
     /// Set by the popup controller. Called when a row is clicked.
     @ObservationIgnored var onPick: ((ClipItem) -> Void)?
@@ -27,6 +41,14 @@ final class PopupViewModel {
 
     var selectedItem: ClipItem? { item(at: selectedIndex) }
 
+    /// The finished translation of the selected row. ↩ and ⌘C use it instead of the item.
+    var selectedTranslation: String? {
+        guard let translation, translation.itemID == selectedItem?.id,
+              case .done(let text) = translation.state
+        else { return nil }
+        return text
+    }
+
     /// The item at a visible position (pinned first, then recent).
     func item(at index: Int) -> ClipItem? {
         let all = sections.all
@@ -36,6 +58,7 @@ final class PopupViewModel {
     func prepareForOpen() {
         query = ""
         selectedIndex = 0
+        translation = nil
         openCount += 1
     }
 

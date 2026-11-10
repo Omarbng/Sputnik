@@ -28,6 +28,7 @@ struct PopupKeymapTests {
     func commandKeys() {
         #expect(command(0x08, .command) == .copySelected)
         #expect(command(0x33, .command) == .deleteSelected)
+        #expect(command(0x11, .command) == .translateSelected)
         #expect(command(0x00, .command) == .selectAllText)
         #expect(command(0x07, .command) == .cutText)
         #expect(command(0x09, .command) == .pasteText)

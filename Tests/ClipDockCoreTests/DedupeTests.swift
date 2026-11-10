@@ -60,6 +60,19 @@ struct DedupeTests {
         #expect(try db.allItems().count == 2)
     }
 
+    @Test("Translations are stored with the translated badge, and a re-copy keeps it")
+    func translationBadge() throws {
+        var clip = textClip("Доброе утро", at: daysAgo(2))
+        clip.isTranslation = true
+        let stored = try db.ingest(clip, retention: policy)
+        #expect(stored.item.isTranslation)
+
+        let recopied = try db.ingest(textClip("Доброе утро", at: daysAgo(1)), retention: policy)
+        #expect(recopied.wasDuplicate)
+        #expect(recopied.item.isTranslation)
+        #expect(try db.allItems().first?.isTranslation == true)
+    }
+
     @Test("A lone web URL is classified as a URL; other text stays text")
     func urlClassification() {
         #expect(ClipPayload.fromText("  https://example.com/a?b=1\n", rtf: nil) == .url("https://example.com/a?b=1"))

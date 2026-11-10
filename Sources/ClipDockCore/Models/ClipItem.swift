@@ -16,6 +16,8 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
     /// Ordering key. Re-copying or pasting an item bumps it to the top.
     public var lastUsedAt: Date
     public var isPinned: Bool
+    /// Made by ClipDock's translation (shown with a "translated" badge).
+    public var isTranslation: Bool
 
     public init(
         id: Int64? = nil,
@@ -29,7 +31,8 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         byteSize: Int,
         createdAt: Date,
         lastUsedAt: Date,
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        isTranslation: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -43,6 +46,7 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         self.createdAt = createdAt
         self.lastUsedAt = lastUsedAt
         self.isPinned = isPinned
+        self.isTranslation = isTranslation
     }
 
     /// One-line label: first non-empty line of text, file names, or "Image".

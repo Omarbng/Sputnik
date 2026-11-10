@@ -12,6 +12,7 @@ enum AppSettings {
         static let didShowPasteAccessCard = "didShowPasteAccessCard"
         static let didShowAccessibilityCard = "didShowAccessibilityCard"
         static let didPromptAccessibility = "didPromptAccessibility"
+        static let didShowLanguageCard = "didShowLanguageCard"
     }
 
     static var ignoredBundleIDs: [String] {
@@ -35,6 +36,11 @@ enum AppSettings {
     static var didShowAccessibilityCard: Bool {
         get { defaults.bool(forKey: Key.didShowAccessibilityCard) }
         set { defaults.set(newValue, forKey: Key.didShowAccessibilityCard) }
+    }
+
+    static var didShowLanguageCard: Bool {
+        get { defaults.bool(forKey: Key.didShowLanguageCard) }
+        set { defaults.set(newValue, forKey: Key.didShowLanguageCard) }
     }
 
     /// macOS shows its Accessibility prompt only once per app; after that we open Settings.

@@ -2,7 +2,11 @@
 //   cdtool layout-get | layout-set <id> | layout-list
 //   cdtool mouse-get | mouse-set <x> <y>          (top-left-origin screen coordinates)
 //   cdtool screens                                 (AppKit frames, for corner tests)
-//   cdtool target <outfile> [secure]               (paste target window; writes its text on change)
+//   cdtool target <outfile> [secure] [--text <file>]
+//        Paste target window. It writes its text to <outfile> on every change. With --text it
+//        starts with that text, all selected. It undoes on the distributed notification
+//        "com.omar.clipdock.testtarget.undo". Launch it as an app (Tools/README.md) so it comes
+//        to the front.
 import AppKit
 import Carbon
 
@@ -34,16 +38,22 @@ case "screens":
     for s in NSScreen.screens { print(NSStringFromRect(s.frame), NSStringFromRect(s.visibleFrame)) }
 case "target":
     let out = args[2]
-    let secure = args.count > 3 && args[3] == "secure"
+    let secure = args.contains("secure")
+    let initial = args.firstIndex(of: "--text").flatMap { try? String(contentsOfFile: args[$0 + 1], encoding: .utf8) }
     final class Target: NSObject, NSApplicationDelegate, NSTextViewDelegate {
-        let out: String; let secure: Bool
+        let out: String; let secure: Bool; let initial: String?
         var window: NSWindow!; var text: NSTextView!
-        init(out: String, secure: Bool) { self.out = out; self.secure = secure }
+        init(out: String, secure: Bool, initial: String?) { self.out = out; self.secure = secure; self.initial = initial }
         func applicationDidFinishLaunching(_ n: Notification) {
             window = NSWindow(contentRect: NSRect(x: 300, y: 300, width: 420, height: 160), styleMask: [.titled], backing: .buffered, defer: false)
             window.title = secure ? "ClipDock test target (secure input)" : "ClipDock test target"
             let scroll = NSTextView.scrollableTextView()
             text = (scroll.documentView as! NSTextView); text.delegate = self
+            text.allowsUndo = true
+            if let initial { text.string = initial; text.selectAll(nil) }
+            DistributedNotificationCenter.default().addObserver(forName: .init("com.omar.clipdock.testtarget.undo"), object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.text.undoManager?.undo(); self?.save() }
+            }
             window.contentView = scroll
             window.makeKeyAndOrderFront(nil); window.makeFirstResponder(text)
             NSApp.activate(ignoringOtherApps: true)
@@ -57,7 +67,15 @@ case "target":
         func save() { try? text.string.write(toFile: out, atomically: true, encoding: .utf8) }
     }
     let app = NSApplication.shared
-    let delegate = Target(out: out, secure: secure)
+    // ⌘C/⌘V/⌘Z reach a text view only through the Edit menu's key equivalents.
+    let mainMenu = NSMenu()
+    let appItem = NSMenuItem(); appItem.submenu = NSMenu(); mainMenu.addItem(appItem)
+    let editItem = NSMenuItem(); let edit = NSMenu(title: "Edit"); editItem.submenu = edit; mainMenu.addItem(editItem)
+    for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
+        edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
+    }
+    app.mainMenu = mainMenu
+    let delegate = Target(out: out, secure: secure, initial: initial)
     app.delegate = delegate
     app.setActivationPolicy(.regular)
     signal(SIGTERM) { _ in exit(0) }   // exiting ends secure input automatically

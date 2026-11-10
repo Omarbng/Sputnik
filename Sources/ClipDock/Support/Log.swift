@@ -7,4 +7,5 @@ enum Log {
     static let storage = Logger(subsystem: "com.omar.clipdock", category: "storage")
     static let popup = Logger(subsystem: "com.omar.clipdock", category: "popup")
     static let paste = Logger(subsystem: "com.omar.clipdock", category: "paste")
+    static let translate = Logger(subsystem: "com.omar.clipdock", category: "translate")
 }

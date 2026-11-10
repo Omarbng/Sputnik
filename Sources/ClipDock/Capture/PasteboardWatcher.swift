@@ -36,6 +36,11 @@ final class PasteboardWatcher {
         timer = nil
     }
 
+    /// Treats the pasteboard's current state as already seen.
+    func skipPendingChanges() {
+        lastChangeCount = pasteboard.changeCount
+    }
+
     private func tick() {
         let count = pasteboard.changeCount
         guard count != lastChangeCount else { return }

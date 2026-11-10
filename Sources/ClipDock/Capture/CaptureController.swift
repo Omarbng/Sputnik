@@ -9,6 +9,7 @@ final class CaptureController {
     private let reader = PasteboardReader()
     private let pipeline: CapturePipeline
     private var accessTimer: Timer?
+    private var suspensions = 0
 
     /// Last seen permission state.
     private(set) var access: NSPasteboard.AccessBehavior
@@ -37,6 +38,22 @@ final class CaptureController {
         onAccessChange?(current)
     }
 
+    /// Ignores pasteboard changes during ClipDock's own work: translation's temporary ⌘C copy
+    /// and the restore of the original clipboard. Calls nest; each needs a `resume()`.
+    func suspend() {
+        suspensions += 1
+    }
+
+    func resume() {
+        suspensions = max(0, suspensions - 1)
+        if suspensions == 0 { watcher.skipPendingChanges() }
+    }
+
+    /// Adds something ClipDock made (a translation) to the history.
+    func record(_ clip: CapturedClip) {
+        pipeline.submit(clip, rules: SkipRules(ignoredBundleIDs: AppSettings.ignoredBundleIDs), retention: AppSettings.retention)
+    }
+
     private func apply(_ behavior: NSPasteboard.AccessBehavior) {
         if behavior == .alwaysAllow {
             accessTimer?.invalidate()
@@ -59,7 +76,7 @@ final class CaptureController {
 
     private func pasteboardChanged() {
         refreshAccess()  // so revoking access in System Settings takes effect before this read
-        guard access == .alwaysAllow else { return }
+        guard access == .alwaysAllow, suspensions == 0 else { return }
         read(attempt: 1, changeCount: NSPasteboard.general.changeCount)
     }
 
@@ -70,7 +87,7 @@ final class CaptureController {
 
     private func read(attempt: Int, changeCount: Int) {
         let pasteboard = NSPasteboard.general
-        guard pasteboard.changeCount == changeCount, access == .alwaysAllow else { return }
+        guard pasteboard.changeCount == changeCount, access == .alwaysAllow, suspensions == 0 else { return }
 
         let rules = SkipRules(ignoredBundleIDs: AppSettings.ignoredBundleIDs)
         let source = NSWorkspace.shared.frontmostApplication

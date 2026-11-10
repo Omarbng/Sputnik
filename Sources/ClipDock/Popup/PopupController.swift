@@ -16,6 +16,7 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private let panel = PopupPanel()
     private let content: PopupContentView
     private let actions: ItemActions
+    private let translation: TranslationService
     private var keyMonitor: Any?
     private var clickMonitor: Any?
 
@@ -27,10 +28,14 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         NSScreen.screens.contains { $0.visibleFrame.contains(panel.frame) }
     }
 
-    init(history: HistoryModel, icons: AppIconCache, thumbnails: ThumbnailCache, actions: ItemActions) {
+    init(
+        history: HistoryModel, icons: AppIconCache, thumbnails: ThumbnailCache,
+        actions: ItemActions, translation: TranslationService
+    ) {
         let model = PopupViewModel(history: history)
         self.model = model
         self.actions = actions
+        self.translation = translation
         content = PopupContentView(list: PopupListView(model: model, icons: icons, thumbnails: thumbnails))
         super.init()
 
@@ -96,11 +101,21 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         case .moveDown:
             model.moveSelection(by: 1)
         case .pasteSelected:
-            if let item = model.selectedItem { paste(item) }
+            if let text = model.selectedTranslation {
+                actions.pasteTranslation(text, closePopup: { close(.picked) })
+            } else if let item = model.selectedItem {
+                paste(item)
+            }
         case .pasteNumber(let number):
             if let item = model.item(at: number - 1) { paste(item) }
         case .copySelected:
-            if let item = model.selectedItem { actions.copy(item, closePopup: { close(.picked) }) }
+            if let text = model.selectedTranslation {
+                actions.copyTranslation(text, closePopup: { close(.picked) })
+            } else if let item = model.selectedItem {
+                actions.copy(item, closePopup: { close(.picked) })
+            }
+        case .translateSelected:
+            translateSelected()
         case .deleteSelected:
             if let item = model.selectedItem {
                 actions.delete(item)
@@ -132,6 +147,26 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     // MARK: Private
+
+    /// ⌘T: translate the selected row and show the result under it.
+    private func translateSelected() {
+        guard let item = model.selectedItem, let id = item.id else { return }
+        guard model.translation?.itemID != id else { return }  // already shown or in progress
+        guard item.kind == .text || item.kind == .url, let text = item.text else {
+            model.translation = RowTranslation(itemID: id, state: .failed("Only text can be translated"))
+            return
+        }
+        model.translation = RowTranslation(itemID: id, state: .working)
+        Task {
+            let state: RowTranslation.State
+            do {
+                state = .done(try await translation.translate(text))
+            } catch {
+                state = .failed(translation.describe(error))
+            }
+            if model.translation?.itemID == id { model.translation?.state = state }
+        }
+    }
 
     private func paste(_ item: ClipItem) {
         actions.paste(item, closePopup: { close(.picked) })

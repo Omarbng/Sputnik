@@ -6,12 +6,21 @@ public struct CapturedClip: Sendable, Equatable {
     public var sourceBundleID: String?
     public var sourceAppName: String?
     public var capturedAt: Date
+    /// A translation ClipDock made, rather than something the user copied.
+    public var isTranslation: Bool
 
-    public init(payload: ClipPayload, sourceBundleID: String?, sourceAppName: String?, capturedAt: Date) {
+    public init(
+        payload: ClipPayload,
+        sourceBundleID: String?,
+        sourceAppName: String?,
+        capturedAt: Date,
+        isTranslation: Bool = false
+    ) {
         self.payload = payload
         self.sourceBundleID = sourceBundleID
         self.sourceAppName = sourceAppName
         self.capturedAt = capturedAt
+        self.isTranslation = isTranslation
     }
 
     public var kind: ClipKind {
