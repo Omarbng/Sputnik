@@ -15,6 +15,20 @@ final class SettingsModel {
     var retentionDays = AppSettings.retentionDays {
         didSet { AppSettings.retentionDays = retentionDays; limitsChanged = true }
     }
+    /// The double-tap keys. Picking the other one's key swaps them, so they never clash.
+    var popupTap = AppSettings.popupTap {
+        didSet {
+            if popupTap != nil, popupTap == translateTap { translateTap = oldValue }
+            AppSettings.popupTap = popupTap
+        }
+    }
+    var translateTap = AppSettings.translateTap {
+        didSet {
+            if translateTap != nil, translateTap == popupTap { popupTap = oldValue }
+            AppSettings.translateTap = translateTap
+        }
+    }
+
     var separator = AppSettings.pasteAllSeparator {
         didSet { AppSettings.pasteAllSeparator = separator }
     }
@@ -36,6 +50,8 @@ final class SettingsModel {
         retentionDays = AppSettings.retentionDays
         separator = AppSettings.pasteAllSeparator
         ignoredApps = AppSettings.ignoredBundleIDs
+        popupTap = AppSettings.popupTap
+        translateTap = AppSettings.translateTap
         limitsChanged = false
         refreshStatus(languagesMissing: languagesMissing)
     }

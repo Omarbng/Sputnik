@@ -1,7 +1,7 @@
 import AppKit
 import ClipDockCore
 
-/// Translation actions: in place (⌥⌘T), show only (⇧⌥⌘T), and for a popup row (⌘T).
+/// Translation: the selected text in any app (double-tap ⌃ → card), and a popup row (⌘T).
 @MainActor
 final class TranslationService {
     /// How long to wait for the target app to answer ⌘C.
@@ -31,24 +31,16 @@ final class TranslationService {
         self.hooks = hooks
     }
 
-    // MARK: Shortcuts
+    // MARK: Shortcut
 
-    /// ⌥⌘T. Replaces the selection with its translation; ⌘Z in the app undoes it.
-    func translateSelectionInPlace() {
+    /// Double-tap ⌃ (or the optional key combo): translate the selected text and show it in a
+    /// card at the cursor. In the card, ↩ replaces the selection (⌘Z in the app undoes it),
+    /// ⌘C copies, and Esc closes.
+    func translateSelection() {
         guard !isBusy, canReadSelection() else { return }
         isBusy = true
         Task {
-            await inPlace()
-            isBusy = false
-        }
-    }
-
-    /// ⇧⌥⌘T. Shows the translation in a card at the cursor and doesn't change anything.
-    func translateSelectionShowOnly() {
-        guard !isBusy, canReadSelection() else { return }
-        isBusy = true
-        Task {
-            await showOnly()
+            await showCard()
             isBusy = false
         }
     }
@@ -83,78 +75,64 @@ final class TranslationService {
 
     // MARK: Private
 
-    private func inPlace() async {
+    private func showCard() async {
         let target = NSWorkspace.shared.frontmostApplication
         capture.beginIgnoringChanges()
         let snapshot = PasteboardSnapshot.take()
-
-        let selection: String
-        switch await SelectionGrabber.copySelection(timeout: Self.copyTimeout) {
-        case .nothingCopied:
-            capture.endIgnoringChanges()
-            hud.show("Select some text first", style: .error)
-            Log.translate.notice("inPlace stopped reason=nothingCopied")
-            return
-        case .notText:
-            snapshot.restore()
-            capture.endIgnoringChanges()
-            hud.show("Select some text first", style: .error)
-            Log.translate.notice("inPlace stopped reason=notText")
-            return
-        case .text(let text):
-            selection = text
-        }
-
-        let direction = LanguageDetector.direction(for: selection)
-        let translation: String
-        do {
-            translation = try await translateShowingProgress(selection, direction: direction)
-        } catch {
-            snapshot.restore()
-            capture.endIgnoringChanges()
-            hud.show(describe(error), style: .error)
-            return
-        }
-
-        PasteboardWriter.write(text: translation)
-        KeySender.commandV()
-        try? await Task.sleep(for: Self.restoreDelay)
-        snapshot.restore()
-        capture.endIgnoringChanges()
-        record(translation, from: target)
-        Log.translate.notice("""
-            inPlace direction=\(direction.rawValue, privacy: .public) \
-            chars=\(selection.count, privacy: .public)->\(translation.count, privacy: .public)
-            """)
-    }
-
-    private func showOnly() async {
-        let source = NSWorkspace.shared.frontmostApplication
-        capture.beginIgnoringChanges()
-        let snapshot = PasteboardSnapshot.take()
         let grabbed = await SelectionGrabber.copySelection(timeout: Self.copyTimeout)
-        if grabbed != .nothingCopied { snapshot.restore() }
+        if grabbed != .nothingCopied { snapshot.restore() }  // the temporary ⌘C copy is never kept
         capture.endIgnoringChanges()
 
         guard case .text(let selection) = grabbed else {
             hud.show("Select some text first", style: .error)
-            Log.translate.notice("showOnly stopped reason=\(grabbed == .nothingCopied ? "nothingCopied" : "notText", privacy: .public)")
+            Log.translate.notice("stopped reason=\(grabbed == .nothingCopied ? "nothingCopied" : "notText", privacy: .public)")
             return
         }
         let direction = LanguageDetector.direction(for: selection)
         do {
             let translation = try await translateShowingProgress(selection, direction: direction)
-            card.show(translation: translation, direction: direction) { [weak self] in
-                PasteboardWriter.write(text: translation)
-                self?.record(translation, from: source)
-                self?.hud.show("Copied")
-            }
+            card.show(
+                translation: translation,
+                direction: direction,
+                onReplace: { [weak self] in self?.replaceSelection(with: translation, in: target) },
+                onCopy: { [weak self] in
+                    PasteboardWriter.write(text: translation)
+                    self?.record(translation, from: target)
+                    self?.hud.show("Copied")
+                }
+            )
             Log.translate.notice("""
-                showOnly direction=\(direction.rawValue, privacy: .public) \
+                card direction=\(direction.rawValue, privacy: .public) \
                 chars=\(selection.count, privacy: .public)->\(translation.count, privacy: .public)
                 """)
         } catch {
             hud.show(describe(error), style: .error)
+        }
+    }
+
+    /// ↩ in the card: paste the translation over the still-selected text, then put the
+    /// clipboard back the way it was.
+    private func replaceSelection(with translation: String, in target: NSRunningApplication?) {
+        Task {
+            try? await Task.sleep(for: Paster.delay)  // let focus return to the app after the card closes
+            guard let target, NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
+                  !SecureInput.isEnabled
+            else {
+                PasteboardWriter.write(text: translation)
+                record(translation, from: target)
+                hud.show("Copied — press ⌘V", style: .error)
+                Log.translate.notice("replace fallback: target not frontmost or secure input")
+                return
+            }
+            capture.beginIgnoringChanges()
+            let snapshot = PasteboardSnapshot.take()
+            PasteboardWriter.write(text: translation)
+            KeySender.commandV()
+            try? await Task.sleep(for: Self.restoreDelay)
+            snapshot.restore()
+            capture.endIgnoringChanges()
+            record(translation, from: target)
+            Log.translate.notice("replaced chars=\(translation.count, privacy: .public)")
         }
     }
 

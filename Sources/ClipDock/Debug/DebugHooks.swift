@@ -10,8 +10,10 @@ import ClipDockCore
 ///   query  {text}                  set the search text
 ///   key    {keyCode, command}      press a key through the popup's keymap
 ///   state                          log the popup state (ids, counts, on-screen check)
-///   translateInPlace               same as ⌥⌘T
-///   translateShowOnly              same as ⇧⌥⌘T
+///   translate                      same as the translate shortcut (double-tap ⌃)
+///   card {text: replace|copy|close} press a button in the translation card
+///   postDoubleTap {text: option|control}  post two real modifier taps through the system,
+///                                  to test the double-tap monitor end to end
 ///   openSettings / closeSettings   the Settings window
 ///   clearHistoryNow                Clear history without the confirmation alert
 ///   pause {seconds} / resume       Pause capture (seconds < 0: until resumed)
@@ -28,6 +30,7 @@ final class DebugHooks {
     struct Targets {
         let popup: PopupController
         let translation: TranslationService
+        let card: TranslationCardController
         let settings: SettingsWindowController
         let maintenance: HistoryMaintenance
         let capture: CaptureController
@@ -66,8 +69,15 @@ final class DebugHooks {
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
             Log.app.notice("debug snapshot written")
         }
-        observe("translateInPlace") { _ in translation.translateSelectionInPlace() }
-        observe("translateShowOnly") { _ in translation.translateSelectionShowOnly() }
+        observe("translate") { _ in translation.translateSelection() }
+        observe("card") { info in
+            let command: [String: PopupCommand] = ["replace": .pasteSelected, "copy": .copySelected, "close": .close]
+            if let command = command[info.text ?? ""] { targets.card.perform(command) }
+        }
+        observe("postDoubleTap") { info in
+            guard let modifier = TapModifier(rawValue: info.text ?? "") else { return }
+            Task { await Self.postDoubleTap(modifier) }
+        }
         observe("query") { info in popup.setQuery(info.text ?? "") }
         observe("key") { info in
             guard let keyCode = info.keyCode else { return }
@@ -103,6 +113,26 @@ final class DebugHooks {
                 """)
         }
         Log.app.notice("debug hooks ready")
+    }
+
+    /// Two press-and-release taps of a modifier, posted at the HID level like a real keyboard.
+    private static func postDoubleTap(_ modifier: TapModifier) async {
+        let (key, flag): (CGKeyCode, CGEventFlags) = switch modifier {
+        case .option: (0x3A, .maskAlternate)
+        case .control: (0x3B, .maskControl)
+        case .command: (0x37, .maskCommand)
+        case .shift: (0x38, .maskShift)
+        }
+        let source = CGEventSource(stateID: .hidSystemState)
+        for _ in 0..<2 {
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down) else { return }
+                event.type = .flagsChanged
+                event.flags = down ? flag : []
+                event.post(tap: .cghidEventTap)
+                try? await Task.sleep(for: .milliseconds(70))
+            }
+        }
     }
 
     private static func dockItem(_ name: String?) -> DockItem? {

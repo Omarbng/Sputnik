@@ -5,6 +5,8 @@ import AppKit
 final class AccessibilityCardController {
     private let card = CardWindow()
     private var timer: Timer?
+    /// Called once Accessibility is granted (the double-tap monitor restarts then).
+    var onGranted: (() -> Void)?
 
     init() {
         card.onClose = { [weak self] in self?.stopWatching() }
@@ -36,6 +38,7 @@ final class AccessibilityCardController {
                 guard AccessibilityAccess.isTrusted else { return }
                 Log.paste.notice("accessibility granted")
                 self?.card.close()
+                self?.onGranted?()
             }
         }
         RunLoop.main.add(timer, forMode: .common)

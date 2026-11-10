@@ -51,6 +51,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         let open = item("Open ClipDock", #selector(openPopup))
         open.setShortcut(for: .openPopup)
+        if let tap = AppSettings.popupTap {
+            open.subtitle = "Tap \(tap.symbol) \(tap.name) twice"
+        }
         menu.addItem(open)
         menu.addItem(pauseItem())
         menu.addItem(item("Clear History…", #selector(clearHistory)))

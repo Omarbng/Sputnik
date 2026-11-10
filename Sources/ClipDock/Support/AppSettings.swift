@@ -15,6 +15,36 @@ enum AppSettings {
         static let didShowLanguageCard = "didShowLanguageCard"
         static let pasteAllSeparator = "pasteAllSeparator"
         static let pausedUntil = "pausedUntil"
+        static let popupTap = "popupDoubleTap"
+        static let translateTap = "translateDoubleTap"
+        static let didMigrateToDoubleTaps = "didMigrateToDoubleTaps"
+    }
+
+    /// The modifier to double-tap to open the clipboard (default ⌥), or nil for off.
+    static var popupTap: TapModifier? {
+        get { tapSetting(Key.popupTap, default: .option) }
+        set { defaults.set(newValue?.rawValue ?? "off", forKey: Key.popupTap) }
+    }
+
+    /// The modifier to double-tap to translate the selected text (default ⌃), or nil for off.
+    static var translateTap: TapModifier? {
+        get { tapSetting(Key.translateTap, default: .control) }
+        set { defaults.set(newValue?.rawValue ?? "off", forKey: Key.translateTap) }
+    }
+
+    private static func tapSetting(_ key: String, default fallback: TapModifier) -> TapModifier? {
+        guard let raw = defaults.string(forKey: key) else { return fallback }
+        return TapModifier(rawValue: raw)  // "off" → nil
+    }
+
+    /// One-time cleanup: the old combo shortcuts (⌘⇧V, ⌥⌘T, ⇧⌥⌘T) were stored by
+    /// KeyboardShortcuts. Omar replaced them with double-taps on 2026-11-11.
+    static func removeOldComboShortcutsOnce() {
+        guard !defaults.bool(forKey: Key.didMigrateToDoubleTaps) else { return }
+        for name in ["openPopup", "translateInPlace", "translateShowOnly"] {
+            defaults.removeObject(forKey: "KeyboardShortcuts_" + name)
+        }
+        defaults.set(true, forKey: Key.didMigrateToDoubleTaps)
     }
 
     static var ignoredBundleIDs: [String] {

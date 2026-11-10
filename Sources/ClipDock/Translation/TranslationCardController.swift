@@ -2,8 +2,8 @@ import AppKit
 import ClipDockCore
 import SwiftUI
 
-/// The show-only (⇧⌥⌘T) result: a small card at the cursor with a Copy button.
-/// Esc, a click outside, or losing focus closes it.
+/// The translation card at the cursor (double-tap ⌃). ↩ replaces the selected text, ⌘C copies
+/// the translation, and Esc, a click outside, or losing focus closes it.
 @MainActor
 final class TranslationCardController: NSObject, NSWindowDelegate {
     static let width: CGFloat = 380
@@ -13,19 +13,25 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
     private var keyMonitor: Any?
     private var clickMonitor: Any?
     private var onCopy: (() -> Void)?
+    private var onReplace: (() -> Void)?
 
     override init() {
         super.init()
         panel.delegate = self
     }
 
-    func show(translation: String, direction: TranslationDirection, onCopy: @escaping () -> Void) {
+    func show(
+        translation: String, direction: TranslationDirection,
+        onReplace: @escaping () -> Void, onCopy: @escaping () -> Void
+    ) {
         self.onCopy = onCopy
+        self.onReplace = onReplace
         let textHeight = min(Self.textHeight(translation), Self.maxTextHeight)
         let host = NSHostingView(rootView: TranslationCardView(
             text: translation,
             direction: direction,
             textHeight: textHeight,
+            onReplace: { [weak self] in self?.replace() },
             onCopy: { [weak self] in self?.copyTranslation() }
         ))
         let size = host.fittingSize
@@ -49,9 +55,26 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
         close()
     }
 
+    /// Debug hooks press the card's buttons through this.
+    func perform(_ command: PopupCommand) {
+        switch command {
+        case .pasteSelected: replace()
+        case .copySelected: copyTranslation()
+        case .close: close()
+        default: break
+        }
+    }
+
     private func copyTranslation() {
         onCopy?()
         close()
+    }
+
+    /// Close first, so focus goes back to the app that still has the selection.
+    private func replace() {
+        let action = onReplace
+        close()
+        action?()
     }
 
     private func installMonitors() {
@@ -62,6 +85,7 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
                 switch PopupKeymap.command(keyCode: event.keyCode, modifiers: .init(event.modifierFlags)) {
                 case .close?: self.close()
                 case .copySelected?: self.copyTranslation()
+                case .pasteSelected?: self.replace()
                 default: return false
                 }
                 return true
@@ -98,6 +122,7 @@ struct TranslationCardView: View {
     let text: String
     let direction: TranslationDirection
     let textHeight: CGFloat
+    let onReplace: () -> Void
     let onCopy: () -> Void
     @Environment(\.colorScheme) private var scheme
 
@@ -121,24 +146,30 @@ struct TranslationCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: textHeight)
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
-                Button(action: onCopy) {
-                    HStack(spacing: 6) {
-                        Text("Copy").font(.system(size: 13, weight: .medium)).tracking(-0.13)
-                        Text("⌘C").font(.system(size: 11, weight: .medium)).foregroundStyle(tokens.mutedForeground)
-                    }
-                    .foregroundStyle(tokens.foreground)
-                    .padding(.horizontal, 12)
-                    .frame(height: 28)
-                    .background(tokens.accent, in: Capsule())
-                }
-                .buttonStyle(.plain)
+                cardButton("Copy", keys: "⌘C", tokens: tokens, prominent: false, action: onCopy)
+                cardButton("Replace", keys: "↩", tokens: tokens, prominent: true, action: onReplace)
             }
         }
         .padding(16)
         .frame(width: TranslationCardController.width)
         .background(MaterialBackground(cornerRadius: PopupLayout.cardCornerRadius))
         .padding(Self.shadowMargin)
+    }
+
+    /// Replace is the inverted (primary) button, Copy the quiet one.
+    private func cardButton(_ title: String, keys: String, tokens: Tokens, prominent: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title).font(.system(size: 13, weight: .medium)).tracking(-0.13)
+                Text(keys).font(.system(size: 11, weight: .medium)).opacity(0.6)
+            }
+            .foregroundStyle(prominent ? tokens.primaryForeground : tokens.foreground)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(prominent ? tokens.primary : tokens.accent, in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

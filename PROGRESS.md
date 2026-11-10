@@ -9,7 +9,13 @@
 - [x] **M4 — Pins, paste all, settings** (Claude tested it, see "M4 test results")
 - [x] **M5 — UI pass** (built to section 5 as written, as Omar chose on 2026-11-10. It
   needs Omar's sign-off on the look and motion)
-- [ ] M6 — Claude translation (optional)
+- [x] **Shortcut change** (2026-11-11, Omar): Wispr-Flow-style double-taps replace the combos
+  (see below)
+- [ ] M6 — Claude translation (optional; Omar hasn't decided yet)
+- [ ] **M7 — Dictation (planned, Omar's request on 2026-11-11):** after ClipDock is finished,
+  write up what an on-device voice-dictation feature would take, in quality, effort, and
+  what it can and can't match in Wispr Flow, before building anything. It's outside the
+  brief's original scope (section 9).
 
 ## How to build and test
 - `./run.sh` builds, signs, installs to `~/Applications/ClipDock.app`, and relaunches.
@@ -125,6 +131,20 @@
   are never read. The icon shows an empty clipboard while paused.
 - **Focus:** closing a ClipDock window calls `NSApp.deactivate()`, and `Paster` won't send
   ⌘V while ClipDock itself is frontmost. It shows "Copied — press ⌘V" instead.
+- **Shortcuts: double-taps (Omar, 2026-11-11).**
+  - Tap ⌥ twice to open the clipboard. Tap ⌃ twice to translate the selected text.
+  - Translating shows a card at the cursor: ↩ Replace pastes over the still-selected text and
+    restores the clipboard, ⌘C copies, and Esc closes. That one flow replaces ⌥⌘T and ⇧⌥⌘T.
+  - `ModifierTapDetector` (Core, 8 tests) counts a tap only for a lone modifier press and
+    release under 0.35 s, with the second press within 0.4 s. Combos, key presses, and clicks
+    cancel it, and block taps until every modifier is released. It fires on the second release.
+  - `DoubleTapMonitor` uses global and local `NSEvent` monitors, which need Accessibility. It
+    restarts when Accessibility is granted.
+  - Settings has a picker per action (⌥, ⌃, ⌘, ⇧, or Off). Picking the other action's key
+    swaps the two. Optional KeyboardShortcuts combos have no default.
+  - The stored old combos (⌘⇧V and friends) are removed once at launch, which also gives ⌘⇧V
+    back to Chrome.
+  - The brief's section 3 is updated to match.
 - **Space** marks items only while the search box is empty. With text in the box it types a
   space, so multi-word search works. Omar chose this on 2026-11-10, over the brief's "Space
   always marks".
@@ -240,6 +260,14 @@
 - Open time with the new UI: 17–42 ms over 6 opens. The target is under 100 ms.
 - Regression on the new UI: the M3 scenarios (in place, show only, popup ⌘T), paste all, and
   the Space rule all pass.
+
+## Double-tap test results (2026-11-11)
+- Real HID modifier events posted by a debug hook: ⌥⌥ was detected and opened the popup,
+  and ⌃⌃ on selected text opened the card without touching the text.
+- Replace put the translation in place, and Copy copied it. The clipboard was identical
+  afterwards in both cases.
+- Popup lifetime check: double-tap and toggle opens behaved the same. One early close
+  (`resignedKey`) lined up with another app taking focus while Omar was using the Mac.
 
 ## Known issues
 - Not tested by Claude: the motion itself (springs and fades, which snapshots can't show), and

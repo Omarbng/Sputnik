@@ -16,10 +16,15 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Shortcuts") {
-                KeyboardShortcuts.Recorder("Open ClipDock", name: .openPopup)
-                KeyboardShortcuts.Recorder("Translate selection", name: .translateInPlace)
-                KeyboardShortcuts.Recorder("Translate, show only", name: .translateShowOnly)
-                note("⌘⇧V takes over \"paste as plain text\" in Chrome and Google Docs.")
+                tapPicker("Open clipboard history", selection: $model.popupTap)
+                tapPicker("Translate selected text", selection: $model.translateTap)
+                note("Tap the key twice, quickly, on its own. In the translation card, ↩ replaces the text, ⌘C copies it, and Esc closes it.")
+            }
+
+            Section("Key combinations (optional)") {
+                KeyboardShortcuts.Recorder("Open clipboard history", name: .openPopup)
+                KeyboardShortcuts.Recorder("Translate selected text", name: .translate)
+                note("Use these if you'd rather press a combination, such as ⌘⇧V.")
             }
 
             Section("History") {
@@ -64,6 +69,16 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 660)
+    }
+
+    private func tapPicker(_ title: String, selection: Binding<TapModifier?>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(TapModifier.allCases, id: \.self) { modifier in
+                Text("Tap \(modifier.symbol) \(modifier.name) twice").tag(Optional(modifier))
+            }
+            Divider()
+            Text("Off").tag(TapModifier?.none)
+        }
     }
 
     private func ignoredAppRow(_ bundleID: String) -> some View {

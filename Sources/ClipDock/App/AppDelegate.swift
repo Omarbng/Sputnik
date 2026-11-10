@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let pasteAccessCard = PasteAccessWindowController()
     private let accessibilityCard = AccessibilityCardController()
     private let languageCard = LanguagePackCardController()
+    private let doubleTaps = DoubleTapMonitor()
     private var capture: CaptureController?
     private var translation: TranslationService?
     private var popup: PopupController?
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppSettings.removeOldComboShortcutsOnce()  // before KeyboardShortcuts reads them
         guard let database = openDatabase() else { return }
 
         let history = self.history
@@ -31,11 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let pipeline = CapturePipeline(database: database) { change in history.apply(change) }
         let capture = CaptureController(pipeline: pipeline)
+        let translationCard = TranslationCardController()
         let translation = TranslationService(
             translator: Self.makeTranslator(),
             hud: hud,
             capture: capture,
-            card: TranslationCardController(),
+            card: translationCard,
             hooks: .init(
                 needsLanguagePacks: { languageCard.show() },
                 needsAccessibility: { accessibilityCard.show() }
@@ -82,10 +85,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capture.onPauseChange = { [weak statusItem] in statusItem?.refreshIcon() }
         languageCard.onReady = { hud.show("Translation is ready") }
 
+        // Main shortcuts: double-tap ⌥ (clipboard) and ⌃ (translate), changeable in Settings.
+        doubleTaps.onDoubleTap = { [weak popup, weak translation] modifier in
+            if modifier == AppSettings.popupTap {
+                popup?.toggle()
+            } else if modifier == AppSettings.translateTap {
+                translation?.translateSelection()
+            }
+        }
+        doubleTaps.start()
+        accessibilityCard.onGranted = { [weak self] in self?.doubleTaps.start() }
+        // Optional key combos from Settings (none by default). Translation fires on key-up, so the
+        // keys are released before ClipDock sends ⌘C.
         KeyboardShortcuts.onKeyDown(for: .openPopup) { [weak popup] in popup?.toggle() }
-        // Translation shortcuts fire on key-up, so the T key is released before ClipDock sends ⌘C.
-        KeyboardShortcuts.onKeyUp(for: .translateInPlace) { [weak translation] in translation?.translateSelectionInPlace() }
-        KeyboardShortcuts.onKeyUp(for: .translateShowOnly) { [weak translation] in translation?.translateSelectionShowOnly() }
+        KeyboardShortcuts.onKeyUp(for: .translate) { [weak translation] in translation?.translateSelection() }
 
         capture.start()
         statusItem.refreshIcon()
@@ -103,13 +116,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // because any local process could otherwise drive pastes through ClipDock's permissions.
         if ProcessInfo.processInfo.environment["CLIPDOCK_DEBUG_HOOKS"] == "1" {
             debugHooks = DebugHooks(targets: .init(
-                popup: popup, translation: translation, settings: settings, maintenance: maintenance, capture: capture
+                popup: popup, translation: translation, card: translationCard,
+                settings: settings, maintenance: maintenance, capture: capture
             ))
         }
         #endif
         Log.app.notice("launched accessibility=\(AccessibilityAccess.isTrusted, privacy: .public) secureInputCheck=\(SecureInput.isAvailable, privacy: .public)")
         Log.app.notice("""
-            settings maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
+            settings popupTap=\(AppSettings.popupTap?.rawValue ?? "off", privacy: .public) \
+            translateTap=\(AppSettings.translateTap?.rawValue ?? "off", privacy: .public) \
+            maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
             days=\(AppSettings.retentionDays, privacy: .public) \
             separator=\(AppSettings.pasteAllSeparator.rawValue, privacy: .public) \
             ignoredApps=\(AppSettings.ignoredBundleIDs.count, privacy: .public) \

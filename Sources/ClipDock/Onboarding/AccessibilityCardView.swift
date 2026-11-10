@@ -7,10 +7,10 @@ struct AccessibilityCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Let ClipDock paste for you", systemImage: "keyboard")
+            Label("Let ClipDock use the keyboard", systemImage: "keyboard")
                 .font(.headline)
-            Text("When you pick an item, ClipDock puts it on the clipboard and presses ⌘V in the app you were using. macOS needs the **Accessibility** permission for that.")
-            Text("Without it, ClipDock still copies the item, and you press ⌘V yourself.")
+            Text("ClipDock needs the **Accessibility** permission for two things: noticing your double-tap shortcuts (⌥⌥ and ⌃⌃), and pressing ⌘V in the app you were using when you pick an item.")
+            Text("Without it, the shortcuts don't work, and ClipDock only copies items, so you press ⌘V yourself.")
             Text("Click Continue, then turn on ClipDock in System Settings → Privacy & Security → Accessibility. This window closes by itself when that's done.")
                 .foregroundStyle(.secondary)
             HStack {

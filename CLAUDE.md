@@ -43,14 +43,15 @@ A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has
 
 ## 3. Default shortcuts
 
-All of these can be changed in Settings.
+**Changed 2026-11-11 (Omar):** the combos were too complicated. The defaults are now
+Wispr-Flow-style double-taps. All of these can be changed in Settings, and optional key
+combos (such as ⌘⇧V) can still be recorded there.
 
 | Action | Shortcut | Note |
 |---|---|---|
-| Open popup at cursor | ⌘⇧V | Chrome and Google Docs use ⌘⇧V for "paste as plain text", and this takes it over. Tell Omar during M2. |
-| Translate selection in place | ⌥⌘T | Replaces the selected text with the translation. |
-| Translate selection, show only | ⇧⌥⌘T | Shows the translation at the cursor and doesn't replace anything. |
-| Translate with the other engine | ⌃⌥⌘T | Uses Claude if the default is Apple, or Apple if the default is Claude. Added in M6. |
+| Open popup at cursor | tap ⌥ twice | |
+| Translate selected text | tap ⌃ twice | A card shows the translation: ↩ replaces the selection, ⌘C copies, Esc closes. This replaces the old ⌥⌘T and ⇧⌥⌘T. |
+| Translate with the other engine | (M6, to be decided) | Uses Claude if the default is Apple, or Apple if the default is Claude. |
 
 **Inside the popup**
 
