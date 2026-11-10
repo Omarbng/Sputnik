@@ -60,10 +60,25 @@ final class CaptureController {
     private func pasteboardChanged() {
         refreshAccess()  // so revoking access in System Settings takes effect before this read
         guard access == .alwaysAllow else { return }
+        read(attempt: 1, changeCount: NSPasteboard.general.changeCount)
+    }
+
+    /// Some apps clear the pasteboard and only then write (slowly). Later writes don't bump
+    /// `changeCount`, so an empty read is retried a couple of times for the same change.
+    private static let emptyRetryDelay: TimeInterval = 0.3
+    private static let maxReadAttempts = 3
+
+    private func read(attempt: Int, changeCount: Int) {
+        let pasteboard = NSPasteboard.general
+        guard pasteboard.changeCount == changeCount, access == .alwaysAllow else { return }
 
         let rules = SkipRules(ignoredBundleIDs: AppSettings.ignoredBundleIDs)
         let source = NSWorkspace.shared.frontmostApplication
-        switch reader.read(.general, rules: rules, source: source, now: .now) {
+        switch reader.read(pasteboard, rules: rules, source: source, now: .now) {
+        case .skipped(.empty) where attempt < Self.maxReadAttempts:
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.emptyRetryDelay) { [weak self] in
+                self?.read(attempt: attempt + 1, changeCount: changeCount)
+            }
         case .skipped(let reason):
             Log.capture.notice("skipped reason=\(reason.logName, privacy: .public)")
         case .captured(let clip):
