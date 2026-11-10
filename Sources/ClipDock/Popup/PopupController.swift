@@ -1,20 +1,14 @@
 import AppKit
 import ClipDockCore
+import SwiftUI
 
 /// Owns the popup. The panel is created once at launch and then only shown and hidden, so
 /// opening is instant. It closes on Esc, a click outside, picking an item, or losing focus.
 @MainActor
 final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
-    static let rowHeight: CGFloat = 36
-    static let maxVisibleRows: CGFloat = 8
-    static let size = CGSize(
-        width: 360,
-        height: PopupContentView.searchHeight + 1 + maxVisibleRows * rowHeight + 8
-    )
-
     let model: PopupViewModel
     private let panel = PopupPanel()
-    private let content: PopupContentView
+    private let searchField = NSTextField.popupSearchField()
     private let actions: ItemActions
     private let translation: TranslationService
     private var keyMonitor: Any?
@@ -24,11 +18,14 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     var onOpenSettings: (() -> Void)?
 
     var isVisible: Bool { panel.isVisible }
-    var frame: CGRect { panel.frame }
+    /// For debug snapshots.
+    var contentView: NSView? { panel.contentView }
+    /// The visible dock and card (the panel itself is larger, for tooltips and shadows).
+    var frame: CGRect { PopupLayout.contentFrame(inWindow: panel.frame) }
 
-    /// True when the panel sits entirely inside one screen's visible frame.
+    /// True when the dock and card sit entirely inside one screen's visible frame.
     var isFullyOnScreen: Bool {
-        NSScreen.screens.contains { $0.visibleFrame.contains(panel.frame) }
+        NSScreen.screens.contains { $0.visibleFrame.contains(frame) }
     }
 
     init(
@@ -39,14 +36,21 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         self.model = model
         self.actions = actions
         self.translation = translation
-        content = PopupContentView(list: PopupListView(model: model, icons: icons, thumbnails: thumbnails))
         super.init()
 
+        let root = PopupRootView(
+            model: model, icons: icons, thumbnails: thumbnails, searchField: searchField,
+            onDock: { [weak self] item in self?.handleDock(item) }
+        )
+        let hosting = NSHostingView(rootView: root)
+        hosting.sizingOptions = []  // fixed-size panel: SwiftUI must not resize the window
         model.onPick = { [weak self] item in self?.paste(item) }
-        panel.contentView = content
-        panel.setContentSize(Self.size)
+        panel.contentView = hosting
+        panel.setContentSize(PopupLayout.windowSize)
+        panel.acceptsMouseMovedEvents = true  // dock hover and tooltips
+        panel.hasShadow = false  // the SwiftUI surfaces draw their own shadows
         panel.delegate = self
-        content.searchField.delegate = self
+        searchField.delegate = self
     }
 
     enum CloseReason: String {
@@ -62,9 +66,9 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     func prewarm() {
         model.prepareForOpen()
         panel.alphaValue = 0
-        panel.setFrame(CGRect(origin: NSEvent.mouseLocation, size: Self.size), display: false)
+        panel.setFrame(CGRect(origin: NSEvent.mouseLocation, size: PopupLayout.windowSize), display: false)
         panel.orderFrontRegardless()
-        content.layoutSubtreeIfNeeded()
+        panel.contentView?.layoutSubtreeIfNeeded()
         panel.displayIfNeeded()
         panel.orderOut(nil)
         panel.alphaValue = 1
@@ -74,13 +78,14 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         let timing = OpenTiming()
         let frontBefore = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
         model.prepareForOpen()
-        content.searchField.stringValue = ""
+        searchField.stringValue = ""
 
+        // The dock and card go at the cursor; the panel extends around them.
         let screens = NSScreen.screens.map { PopupPlacement.Screen(frame: $0.frame, visibleFrame: $0.visibleFrame) }
-        let frame = PopupPlacement.frame(size: Self.size, cursor: NSEvent.mouseLocation, screens: screens)
-        panel.setFrame(frame, display: false)
+        let content = PopupPlacement.frame(size: PopupLayout.contentSize, cursor: NSEvent.mouseLocation, screens: screens)
+        panel.setFrame(PopupLayout.windowFrame(forContent: content), display: false)
         panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(content.searchField)
+        panel.makeFirstResponder(searchField)
         installMonitors()
         panel.displayIfNeeded()
         timing.finish()
@@ -138,18 +143,31 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
                 model.clampSelection()
             }
         case .selectAllText:
-            content.searchField.currentEditor()?.selectAll(nil)
+            searchField.currentEditor()?.selectAll(nil)
         case .cutText:
-            content.searchField.currentEditor()?.cut(nil)
+            searchField.currentEditor()?.cut(nil)
         case .pasteText:
-            content.searchField.currentEditor()?.paste(nil)
+            searchField.currentEditor()?.paste(nil)
         }
     }
 
     /// Sets the search text as if typed (used by debug hooks).
     func setQuery(_ text: String) {
-        content.searchField.stringValue = text
+        searchField.stringValue = text
         model.query = text
+    }
+
+    /// A dock button was clicked.
+    func handleDock(_ item: DockItem) {
+        switch item {
+        case .history: model.scope = .history
+        case .pinned: model.scope = model.scope == .pinned ? .history : .pinned
+        case .translate: perform(.translateSelected)
+        case .pasteAll: perform(.pasteMarked)
+        case .settings: perform(.openSettings)
+        case .toggle: model.isCollapsed.toggle()
+        }
+        if panel.isVisible { panel.makeFirstResponder(searchField) }  // keep typing working after a click
     }
 
     // MARK: NSWindowDelegate / NSTextFieldDelegate
@@ -159,7 +177,8 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     func controlTextDidChange(_ obj: Notification) {
-        model.query = content.searchField.stringValue
+        model.isCollapsed = false
+        model.query = searchField.stringValue
     }
 
     // MARK: Private
@@ -214,6 +233,15 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         guard event.window === panel,
               let command = PopupKeymap.command(keyCode: event.keyCode, modifiers: .init(event.modifierFlags))
         else { return false }
+        return handle(command)
+    }
+
+    /// Runs a key's command. Returns false when the key should go to the search field instead.
+    func handle(_ command: PopupCommand) -> Bool {
+        // Space marks items only while the search box is empty; otherwise it types a space,
+        // so multi-word searches work (Omar's choice, 2026-11-10).
+        if command == .toggleMark, !model.query.isEmpty { return false }
+        if command != .close { model.isCollapsed = false }  // any action brings the list back
         perform(command)
         return true
     }

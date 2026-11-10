@@ -17,6 +17,17 @@ struct RowTranslation: Equatable {
 @MainActor
 @Observable
 final class PopupViewModel {
+    /// History shows everything; Pinned shows only pinned items (the dock's first two buttons).
+    enum Scope { case history, pinned }
+
+    var scope = Scope.history {
+        didSet { if scope != oldValue { selectedIndex = 0 } }
+    }
+    /// The dock's collapse toggle: the list card hides and only the dock is left.
+    var isCollapsed = false
+    /// The dock button under the pointer, which drives the tooltip rail.
+    var hoveredDockItem: DockItem?
+
     var query = "" {
         didSet { if query != oldValue { selectedIndex = 0 } }
     }
@@ -38,8 +49,11 @@ final class PopupViewModel {
     }
 
     var sections: HistoryFilter.Sections {
-        HistoryFilter.sections(of: history.items, query: query, keys: history.searchKeys)
+        let sections = HistoryFilter.sections(of: history.items, query: query, keys: history.searchKeys)
+        return scope == .pinned ? HistoryFilter.Sections(pinned: sections.pinned, recent: []) : sections
     }
+
+    var hasPinned: Bool { history.items.contains { $0.isPinned } }
 
     var selectedItem: ClipItem? { item(at: selectedIndex) }
 
@@ -59,6 +73,9 @@ final class PopupViewModel {
 
     func prepareForOpen() {
         query = ""
+        scope = .history
+        isCollapsed = false
+        hoveredDockItem = nil
         selectedIndex = 0
         translation = nil
         marks.removeAll()

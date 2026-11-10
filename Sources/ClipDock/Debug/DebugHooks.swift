@@ -16,6 +16,9 @@ import ClipDockCore
 ///   clearHistoryNow                Clear history without the confirmation alert
 ///   pause {seconds} / resume       Pause capture (seconds < 0: until resumed)
 ///   settingsState                  log the saved settings
+///   dock {text: name}              press a dock button (history, pinned, translate, pasteAll, settings, toggle)
+///   hover {text: name}             pretend the pointer is over a dock button ("" clears it)
+///   snapshot {text: path}          render the popup to a PNG (the behind-window blur doesn't render)
 ///   focused {text}                 log whether the focused text field contains `text`
 ///                                  (a yes/no only; the field's text is never logged)
 @MainActor
@@ -52,14 +55,25 @@ final class DebugHooks {
                 """)
         }
         observe("toggle") { _ in popup.toggle() }
+        observe("dock") { info in
+            if let item = Self.dockItem(info.text) { popup.handleDock(item) }
+        }
+        observe("hover") { info in popup.model.hoveredDockItem = Self.dockItem(info.text) }
+        observe("snapshot") { info in
+            guard let path = info.text, let view = popup.contentView,
+                  let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+            Log.app.notice("debug snapshot written")
+        }
         observe("translateInPlace") { _ in translation.translateSelectionInPlace() }
         observe("translateShowOnly") { _ in translation.translateSelectionShowOnly() }
         observe("query") { info in popup.setQuery(info.text ?? "") }
         observe("key") { info in
             guard let keyCode = info.keyCode else { return }
             let modifiers: PopupKeymap.Modifiers = info.command ? .command : []
-            if let command = PopupKeymap.command(keyCode: keyCode, modifiers: modifiers) {
-                popup.perform(command)
+            if let command = PopupKeymap.command(keyCode: keyCode, modifiers: modifiers), !popup.handle(command) {
+                Log.popup.notice("debug key passed to the search field")
             }
         }
         observe("state") { _ in
@@ -89,6 +103,11 @@ final class DebugHooks {
                 """)
         }
         Log.app.notice("debug hooks ready")
+    }
+
+    private static func dockItem(_ name: String?) -> DockItem? {
+        ["history": DockItem.history, "pinned": .pinned, "translate": .translate,
+         "pasteAll": .pasteAll, "settings": .settings, "toggle": .toggle][name ?? ""]
     }
 
     /// State and length only, never the text.

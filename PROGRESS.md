@@ -7,7 +7,8 @@
 - [x] **M3 — Translation** (works end to end with the stand-in translator. The real Apple
   engine needs the English and Russian downloads, which Omar must confirm in the macOS prompt)
 - [x] **M4 — Pins, paste all, settings** (Claude tested it, see "M4 test results")
-- [ ] M5 — UI pass
+- [x] **M5 — UI pass** (built to section 5 as written, as Omar chose on 2026-11-10. It
+  needs Omar's sign-off on the look and motion)
 - [ ] M6 — Claude translation (optional)
 
 ## How to build and test
@@ -124,6 +125,38 @@
   are never read. The icon shows an empty clipboard while paused.
 - **Focus:** closing a ClipDock window calls `NSApp.deactivate()`, and `Paster` won't send
   ⌘V while ClipDock itself is frontmost. It shows "Copied — press ⌘V" instead.
+- **Space** marks items only while the search box is empty. With text in the box it types a
+  space, so multi-word search works. Omar chose this on 2026-11-10, over the brief's "Space
+  always marks".
+- **M5 design (section 5):**
+  - `Design/Tokens` holds the shadcn neutral colours, dark plus inverted light, following the
+    system appearance.
+  - `Design/Motion` holds the springs: slide 0.7/650/44, reveal 0.7/720/52, collapse
+    0.9/460/42. The fade is 180 ms with `timingCurve(0.22, 1, 0.36, 1)`. With Reduce Motion,
+    movement is instant and fades take 120 ms.
+  - `Design/MaterialBackground` is a behind-window blur (masked `NSVisualEffectView`) under a
+    95% fill, with a 1 pt border and a large shadow. The dock, card, HUD, and translation card
+    all share it.
+- **Popup layout:**
+  - The dock pill is 48 pt, with 32 pt buttons and 2 pt gaps: History, Pinned, Translate,
+    Paste all, Settings, then a divider and the toggle.
+  - Under it is a 360 pt card with 18 pt corners, holding the search field and the list.
+  - The panel is larger than what you see (tooltip room plus shadow margins). Placement
+    positions the visible stack at the cursor.
+- **Dock behaviour:**
+  - History and Pinned switch the list's scope, and the active one is filled.
+  - The Pinned badge shows when anything is pinned. The Paste-all badge shows while items
+    are marked.
+  - The toggle collapses the pill toward itself (it never moves), and the card fades out.
+    Any key or typing expands it again. Each open starts expanded.
+- **Tooltip rail:** one inverted surface holding every label side by side. It slides (`x`)
+  and clips (`width`) to the hovered button. The first hover appears in place. Hover is
+  tracked with `onContinuousHover` across the whole dock, so moving between buttons doesn't
+  flicker.
+- **Selected row:** a capsule with `matchedGeometryEffect`, animated with the slide spring.
+- **HUD and show-only card:** same material, fading in and out over 180 ms.
+- **Debug hooks:** `dock`, `hover`, and `snapshot` render the popup to a PNG with
+  `cacheDisplay`, since screenshots need Screen Recording.
 - **Logging:** `notice` level, so messages are kept and visible in `log show`. They contain
   only ids, kinds, sizes, and skip reasons.
 - Dependencies get added in the milestone that needs them: GRDB 7.12 in M1,
@@ -201,7 +234,16 @@
 - Unit tests: 65, including pinned items surviving the 30-day retention with a faked clock.
 - Omar's history and settings were backed up before the run and restored afterwards.
 
+## M5 test results (2026-11-11)
+- Snapshots of the expanded dock, tooltip, mid-slide, and collapsed states match section 5.1
+  and 5.4.
+- Open time with the new UI: 17–42 ms over 6 opens. The target is under 100 ms.
+- Regression on the new UI: the M3 scenarios (in place, show only, popup ⌘T), paste all, and
+  the Space rule all pass.
+
 ## Known issues
+- Not tested by Claude: the motion itself (springs and fades, which snapshots can't show), and
+  how the blur looks over real windows.
 - Not tested by Claude: the look of the Settings window, and turning on Launch at login
   (it changes the login items, so that's left for Omar).
 - Not tested by Claude:

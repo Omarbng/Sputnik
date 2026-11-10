@@ -30,8 +30,12 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
         ))
         let size = host.fittingSize
         panel.contentView = host
+        panel.hasShadow = false  // the card draws its own shadow
+        let margin = TranslationCardView.shadowMargin
+        let card = CGSize(width: size.width - margin * 2, height: size.height - margin * 2)
         let screens = NSScreen.screens.map { PopupPlacement.Screen(frame: $0.frame, visibleFrame: $0.visibleFrame) }
-        panel.setFrame(PopupPlacement.frame(size: size, cursor: NSEvent.mouseLocation, screens: screens), display: true)
+        let frame = PopupPlacement.frame(size: card, cursor: NSEvent.mouseLocation, screens: screens)
+        panel.setFrame(frame.insetBy(dx: -margin, dy: -margin), display: true)
         panel.makeKeyAndOrderFront(nil)
         installMonitors()
     }
@@ -86,38 +90,55 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
     }
 }
 
+/// The show-only card: the dock's material, 18 pt corners, the direction, the translation, and
+/// a Copy button with its keycaps.
 struct TranslationCardView: View {
+    static let shadowMargin: CGFloat = 32
+
     let text: String
     let direction: TranslationDirection
     let textHeight: CGFloat
     let onCopy: () -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let tokens = Tokens.for(scheme)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(direction.label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(tokens.mutedForeground)
                 Spacer()
                 Text("Esc to close")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(tokens.mutedForeground)
             }
             ScrollView {
                 Text(text)
                     .font(.system(size: 13))
+                    .foregroundStyle(tokens.foreground)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: textHeight)
             HStack {
                 Spacer()
-                Button("Copy", action: onCopy)
+                Button(action: onCopy) {
+                    HStack(spacing: 6) {
+                        Text("Copy").font(.system(size: 13, weight: .medium)).tracking(-0.13)
+                        Text("⌘C").font(.system(size: 11, weight: .medium)).foregroundStyle(tokens.mutedForeground)
+                    }
+                    .foregroundStyle(tokens.foreground)
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .background(tokens.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(width: TranslationCardController.width)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1)))
+        .background(MaterialBackground(cornerRadius: PopupLayout.cardCornerRadius))
+        .padding(Self.shadowMargin)
     }
 }

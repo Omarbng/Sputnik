@@ -5,10 +5,10 @@ import SwiftUI
 /// badges · source app icon · age.
 struct ClipRowView: View {
     let item: ClipItem
-    let isSelected: Bool
     let markNumber: Int?
     let appIcon: NSImage?
     let thumbnails: ThumbnailCache
+    let tokens: Tokens
 
     var body: some View {
         HStack(spacing: 10) {
@@ -18,16 +18,16 @@ struct ClipRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             if item.isPinned {
                 Image(systemName: "pin.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tokens.mutedForeground)
             }
             if item.isTranslation {
                 Text("translated")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(tokens.mutedForeground)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .background(.quaternary, in: Capsule())
+                    .overlay(Capsule().strokeBorder(tokens.border, lineWidth: 1))
             }
             if let appIcon {
                 Image(nsImage: appIcon)
@@ -35,18 +35,13 @@ struct ClipRowView: View {
                     .frame(width: 16, height: 16)
             }
             Text(RelativeTime.short(item.lastUsedAt))
-                .font(.caption)
+                .font(.system(size: 11))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 26, alignment: .trailing)
+                .foregroundStyle(tokens.mutedForeground)
+                .frame(minWidth: 24, alignment: .trailing)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 36)
-        .background {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.22) : .clear)
-                .padding(.horizontal, 6)
-        }
+        .padding(.horizontal, 18)
+        .frame(height: PopupLayout.rowHeight)
         .contentShape(Rectangle())
     }
 
@@ -55,23 +50,26 @@ struct ClipRowView: View {
     private var leadingMark: some View {
         if let markNumber {
             Text("\(markNumber)")
-                .font(.caption.weight(.bold))
+                .font(.system(size: 11, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(.white)
+                .foregroundStyle(tokens.primaryForeground)
                 .frame(width: 18, height: 18)
-                .background(Color.accentColor, in: Circle())
+                .background(tokens.primary, in: Circle())
         } else {
             Image(systemName: Self.glyph(for: item.kind))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tokens.mutedForeground)
         }
     }
 
     @ViewBuilder
     private var content: some View {
         if item.kind == .image, let blob = item.imageBlob {
-            ThumbnailView(blobName: blob, cache: thumbnails)
+            ThumbnailView(blobName: blob, cache: thumbnails, tokens: tokens)
         } else {
             Text(item.title.isEmpty ? "(blank)" : item.title)
+                .font(.system(size: 13))
+                .foregroundStyle(tokens.foreground)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
@@ -90,32 +88,36 @@ struct ClipRowView: View {
 /// The ⌘T result under a row: progress, the translation, or why it failed.
 struct RowTranslationView: View {
     let state: RowTranslation.State
+    let tokens: Tokens
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "character.bubble")
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tokens.mutedForeground)
+                .frame(width: 18)
             switch state {
             case .working:
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Translating…").foregroundStyle(.secondary)
+                    Text("Translating…").foregroundStyle(tokens.mutedForeground)
                 }
             case .done(let text):
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(text).lineLimit(4)
+                    Text(text)
+                        .foregroundStyle(tokens.foreground)
+                        .lineLimit(4)
                     Text("↩ paste translation · ⌘C copy it")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(tokens.mutedForeground)
                 }
             case .failed(let message):
                 Text(message).foregroundStyle(.red)
             }
         }
+        .font(.system(size: 13))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 14)
-        .padding(.trailing, 14)
+        .padding(.horizontal, 18)
         .padding(.vertical, 6)
     }
 }
@@ -123,11 +125,13 @@ struct RowTranslationView: View {
 private struct ThumbnailView: View {
     let blobName: String
     let cache: ThumbnailCache
+    let tokens: Tokens
     @State private var image: NSImage?
 
-    init(blobName: String, cache: ThumbnailCache) {
+    init(blobName: String, cache: ThumbnailCache, tokens: Tokens) {
         self.blobName = blobName
         self.cache = cache
+        self.tokens = tokens
         _image = State(initialValue: cache.cached(blobName))
     }
 
@@ -137,10 +141,10 @@ private struct ThumbnailView: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             } else {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(.quaternary)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(tokens.accent)
                     .frame(width: 40)
             }
         }

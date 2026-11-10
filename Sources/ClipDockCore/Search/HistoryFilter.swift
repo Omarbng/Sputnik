@@ -7,6 +7,11 @@ public enum HistoryFilter {
     public struct Sections: Equatable, Sendable {
         public var pinned: [ClipItem]
         public var recent: [ClipItem]
+
+        public init(pinned: [ClipItem], recent: [ClipItem]) {
+            self.pinned = pinned
+            self.recent = recent
+        }
         /// Pinned then recent: the order rows appear in, and what ⌘1–⌘9 count.
         public var all: [ClipItem] { pinned + recent }
     }
