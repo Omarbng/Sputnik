@@ -25,6 +25,12 @@
   `@available(macOS 26.0)`, not 26.4 as the brief says. On this Mac a session can be created
   directly, so the hidden `.translationTask` view isn't needed. Confirm with Omar at M3.
 - Dependencies get added in the milestone that needs them: GRDB in M1, KeyboardShortcuts in M2.
+- **Build output lives in `~/Library/Caches/ClipDock-build/`**, covering both the SwiftPM
+  scratch path and the staged `.app`. The project sits on the iCloud-synced Desktop, and
+  iCloud's File Provider tagged the in-project `build/ClipDock.app` with
+  `com.apple.FinderInfo` while codesign ran, which failed with "resource fork, Finder
+  information, or similar detritus not allowed". `run.sh` also runs `xattr -cr` before
+  signing. For tests later, use `swift test --scratch-path ~/Library/Caches/ClipDock-build/swiftpm`.
 
 ## Known issues
 - Disk space is tight (about 2.6 GB free after deleting a stale Cursor update). Quitting

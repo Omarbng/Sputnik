@@ -9,11 +9,15 @@ CONFIG="${1:-debug}"
 APP_NAME="ClipDock"
 SIGN_IDENTITY="ClipDock Dev"          # self-signed, stable across rebuilds (see PROGRESS.md)
 INSTALL_DIR="$HOME/Applications"
-STAGE="build/$APP_NAME.app"
+# The project lives on the iCloud-synced Desktop. Keep build output outside it so iCloud
+# doesn't upload it, evict it, or tag the bundle mid-codesign.
+BUILD_ROOT="$HOME/Library/Caches/ClipDock-build"
+SWIFT_FLAGS=(-c "$CONFIG" --scratch-path "$BUILD_ROOT/swiftpm")
+STAGE="$BUILD_ROOT/$APP_NAME.app"
 
 echo "==> swift build ($CONFIG)"
-swift build -c "$CONFIG" --product "$APP_NAME"
-BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
+swift build "${SWIFT_FLAGS[@]}" --product "$APP_NAME"
+BIN_DIR="$(swift build "${SWIFT_FLAGS[@]}" --show-bin-path)"
 
 echo "==> assembling $STAGE"
 rm -rf "$STAGE"
@@ -26,6 +30,7 @@ for bundle in "$BIN_DIR"/*.bundle(N); do
 done
 
 echo "==> signing with \"$SIGN_IDENTITY\""
+xattr -cr "$STAGE"   # codesign rejects FinderInfo / resource-fork xattrs
 codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$STAGE"
 codesign --verify --strict "$STAGE"
 
