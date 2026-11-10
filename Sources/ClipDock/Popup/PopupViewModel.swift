@@ -25,6 +25,8 @@ final class PopupViewModel {
     private(set) var openCount = 0
     /// The ⌘T result under a row, if any.
     var translation: RowTranslation?
+    /// Space-marked items for ⌘↩, in the order they were marked.
+    var marks = MarkedSelection()
 
     /// Set by the popup controller. Called when a row is clicked.
     @ObservationIgnored var onPick: ((ClipItem) -> Void)?
@@ -59,6 +61,7 @@ final class PopupViewModel {
         query = ""
         selectedIndex = 0
         translation = nil
+        marks.removeAll()
         openCount += 1
     }
 
@@ -68,8 +71,14 @@ final class PopupViewModel {
         selectedIndex = min(max(selectedIndex + delta, 0), count - 1)
     }
 
-    /// Keeps the selection on a real row after the list shrinks (for example, after a delete).
+    /// Keeps the selection and marks on real rows after the list shrinks (for example, after a delete).
     func clampSelection() {
         selectedIndex = min(selectedIndex, max(sections.all.count - 1, 0))
+        marks.keep(only: Set(history.items.compactMap(\.id)))
+    }
+
+    /// The marked items, in marking order.
+    var markedItems: [ClipItem] {
+        marks.ids.compactMap { history.item(id: $0) }
     }
 }

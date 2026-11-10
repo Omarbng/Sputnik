@@ -12,13 +12,45 @@ import ClipDockCore
 ///   state                          log the popup state (ids, counts, on-screen check)
 ///   translateInPlace               same as ⌥⌘T
 ///   translateShowOnly              same as ⇧⌥⌘T
+///   openSettings / closeSettings   the Settings window
+///   clearHistoryNow                Clear history without the confirmation alert
+///   pause {seconds} / resume       Pause capture (seconds < 0: until resumed)
+///   settingsState                  log the saved settings
 ///   focused {text}                 log whether the focused text field contains `text`
 ///                                  (a yes/no only; the field's text is never logged)
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
 
-    init(popup: PopupController, translation: TranslationService) {
+    struct Targets {
+        let popup: PopupController
+        let translation: TranslationService
+        let settings: SettingsWindowController
+        let maintenance: HistoryMaintenance
+        let capture: CaptureController
+    }
+
+    init(targets: Targets) {
+        let popup = targets.popup
+        let translation = targets.translation
+        observe("openSettings") { _ in targets.settings.show() }
+        observe("closeSettings") { _ in targets.settings.close() }
+        observe("clearHistoryNow") { _ in targets.maintenance.clearHistory() }
+        observe("pause") { info in
+            let seconds = info.seconds ?? -1
+            targets.capture.pause(for: seconds < 0 ? nil : seconds)
+        }
+        observe("resume") { _ in targets.capture.resumeCapture() }
+        observe("settingsState") { _ in
+            Log.app.notice("""
+                debug settings maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
+                days=\(AppSettings.retentionDays, privacy: .public) \
+                separator=\(AppSettings.pasteAllSeparator.rawValue, privacy: .public) \
+                ignoredApps=\(AppSettings.ignoredBundleIDs.joined(separator: ","), privacy: .public) \
+                paused=\(targets.capture.pausedUntil.map { $0 == .distantFuture ? "untilResumed" : "timed" } ?? "no", privacy: .public) \
+                settingsOpen=\(targets.settings.isShowing, privacy: .public)
+                """)
+        }
         observe("toggle") { _ in popup.toggle() }
         observe("translateInPlace") { _ in translation.translateSelectionInPlace() }
         observe("translateShowOnly") { _ in translation.translateSelectionShowOnly() }
@@ -40,6 +72,8 @@ final class DebugHooks {
                 selected=\(model.selectedIndex, privacy: .public) \
                 selectedID=\(model.selectedItem?.id ?? -1, privacy: .public) \
                 ids=\(ids, privacy: .public) \
+                marks=\(model.marks.ids.map(String.init).joined(separator: ","), privacy: .public) \
+                pinned=\(model.sections.pinned.compactMap(\.id).map(String.init).joined(separator: ","), privacy: .public) \
                 frame=\(NSStringFromRect(popup.frame), privacy: .public) \
                 onScreen=\(popup.isFullyOnScreen, privacy: .public) \
                 translation=\(Self.describe(model.translation), privacy: .public)
@@ -84,6 +118,7 @@ final class DebugHooks {
         var text: String?
         var keyCode: UInt16?
         var command: Bool
+        var seconds: Double?
     }
 
     private func observe(_ name: String, _ handler: @escaping @MainActor (Payload) -> Void) {
@@ -94,7 +129,8 @@ final class DebugHooks {
             let payload = Payload(
                 text: info["text"] as? String,
                 keyCode: (info["keyCode"] as? NSNumber)?.uint16Value,
-                command: info["command"] as? Bool ?? false
+                command: info["command"] as? Bool ?? false,
+                seconds: (info["seconds"] as? NSNumber)?.doubleValue
             )
             MainActor.assumeIsolated { handler(payload) }
         }

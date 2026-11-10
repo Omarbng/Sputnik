@@ -9,13 +9,23 @@ final class CaptureController {
     private let reader = PasteboardReader()
     private let pipeline: CapturePipeline
     private var accessTimer: Timer?
+    private var resumeTimer: Timer?
     private var suspensions = 0
 
     /// Last seen permission state.
     private(set) var access: NSPasteboard.AccessBehavior
     var onAccessChange: ((NSPasteboard.AccessBehavior) -> Void)?
+    var onPauseChange: (() -> Void)?
 
-    var isCapturing: Bool { watcher.isRunning }
+    /// True when "Paste from Other Apps" allows reading, so polling runs.
+    var hasAccess: Bool { watcher.isRunning }
+
+    /// When a pause ends by itself (`.distantFuture` for "until resumed"), or nil if not paused.
+    var pausedUntil: Date? {
+        AppSettings.pausedUntil.flatMap { $0 > .now ? $0 : nil }
+    }
+
+    var isCapturing: Bool { hasAccess && pausedUntil == nil }
 
     init(pipeline: CapturePipeline) {
         self.pipeline = pipeline
@@ -24,8 +34,38 @@ final class CaptureController {
     }
 
     func start() {
-        Log.capture.notice("pasteboard access=\(self.access.logName, privacy: .public)")
+        Log.capture.notice("pasteboard access=\(self.access.logName, privacy: .public) paused=\(self.pausedUntil != nil, privacy: .public)")
+        if AppSettings.pausedUntil != nil, pausedUntil == nil { AppSettings.pausedUntil = nil }  // expired while quit
+        scheduleAutoResume()
         apply(access)
+    }
+
+    /// Pause capture for `duration` seconds, or until resumed when nil.
+    func pause(for duration: TimeInterval?) {
+        AppSettings.pausedUntil = duration.map { Date.now.addingTimeInterval($0) } ?? .distantFuture
+        scheduleAutoResume()
+        Log.capture.notice("paused for=\(duration.map { String(Int($0)) } ?? "untilResumed", privacy: .public)")
+        onPauseChange?()
+    }
+
+    func resumeCapture() {
+        AppSettings.pausedUntil = nil
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        watcher.skipPendingChanges()  // what was copied during the pause stays private
+        Log.capture.notice("resumed")
+        onPauseChange?()
+    }
+
+    private func scheduleAutoResume() {
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        guard let until = pausedUntil, until != .distantFuture else { return }
+        let timer = Timer(fire: until, interval: 0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.resumeCapture() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        resumeTimer = timer
     }
 
     /// Re-reads the permission and starts or stops polling to match.
@@ -39,12 +79,12 @@ final class CaptureController {
     }
 
     /// Ignores pasteboard changes during ClipDock's own work: translation's temporary ⌘C copy
-    /// and the restore of the original clipboard. Calls nest; each needs a `resume()`.
-    func suspend() {
+    /// and the restore of the original clipboard. Calls nest; each needs an `endIgnoringChanges()`.
+    func beginIgnoringChanges() {
         suspensions += 1
     }
 
-    func resume() {
+    func endIgnoringChanges() {
         suspensions = max(0, suspensions - 1)
         if suspensions == 0 { watcher.skipPendingChanges() }
     }
@@ -76,7 +116,7 @@ final class CaptureController {
 
     private func pasteboardChanged() {
         refreshAccess()  // so revoking access in System Settings takes effect before this read
-        guard access == .alwaysAllow, suspensions == 0 else { return }
+        guard access == .alwaysAllow, suspensions == 0, pausedUntil == nil else { return }
         read(attempt: 1, changeCount: NSPasteboard.general.changeCount)
     }
 
@@ -87,7 +127,8 @@ final class CaptureController {
 
     private func read(attempt: Int, changeCount: Int) {
         let pasteboard = NSPasteboard.general
-        guard pasteboard.changeCount == changeCount, access == .alwaysAllow, suspensions == 0 else { return }
+        guard pasteboard.changeCount == changeCount, access == .alwaysAllow, suspensions == 0, pausedUntil == nil
+        else { return }
 
         let rules = SkipRules(ignoredBundleIDs: AppSettings.ignoredBundleIDs)
         let source = NSWorkspace.shared.frontmostApplication

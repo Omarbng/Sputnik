@@ -1,20 +1,26 @@
 import ClipDockCore
 import SwiftUI
 
-/// One 36 pt row: type glyph · first line, thumbnail, or file name · source app icon · age.
+/// One 36 pt row: type glyph (or multi-select number) · first line, thumbnail, or file name ·
+/// badges · source app icon · age.
 struct ClipRowView: View {
     let item: ClipItem
     let isSelected: Bool
+    let markNumber: Int?
     let appIcon: NSImage?
     let thumbnails: ThumbnailCache
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: Self.glyph(for: item.kind))
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
+            leadingMark
+                .frame(width: 18)
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if item.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             if item.isTranslation {
                 Text("translated")
                     .font(.caption2.weight(.medium))
@@ -42,6 +48,22 @@ struct ClipRowView: View {
                 .padding(.horizontal, 6)
         }
         .contentShape(Rectangle())
+    }
+
+    /// The order number while multi-selected, otherwise the type glyph.
+    @ViewBuilder
+    private var leadingMark: some View {
+        if let markNumber {
+            Text("\(markNumber)")
+                .font(.caption.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .frame(width: 18, height: 18)
+                .background(Color.accentColor, in: Circle())
+        } else {
+            Image(systemName: Self.glyph(for: item.kind))
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder

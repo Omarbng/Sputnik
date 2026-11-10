@@ -10,6 +10,14 @@ public enum PopupCommand: Equatable, Sendable {
     case deleteSelected
     /// ⌘T: translate the selected item and show the result under it.
     case translateSelected
+    /// Space: add the selected item to the multi-select, or take it out.
+    case toggleMark
+    /// ⌘↩: paste every marked item, in the order they were marked.
+    case pasteMarked
+    /// ⌘P
+    case togglePin
+    /// ⌘,
+    case openSettings
     // Editing in the search field. A menu-bar app has no Edit menu to supply these.
     case selectAllText
     case cutText
@@ -40,6 +48,9 @@ public enum PopupKeymap {
     static let v: UInt16 = 0x09
     static let x: UInt16 = 0x07
     static let t: UInt16 = 0x11
+    static let p: UInt16 = 0x23
+    static let comma: UInt16 = 0x2B
+    static let space: UInt16 = 0x31
     static let digits: [UInt16: Int] = [
         0x12: 1, 0x13: 2, 0x14: 3, 0x15: 4, 0x17: 5, 0x16: 6, 0x1A: 7, 0x1C: 8, 0x19: 9,
     ]
@@ -52,6 +63,7 @@ public enum PopupKeymap {
             case returnKey, keypadEnter: return .pasteSelected
             case upArrow: return .moveUp
             case downArrow: return .moveDown
+            case space: return .toggleMark
             default: return nil
             }
         }
@@ -61,6 +73,9 @@ public enum PopupKeymap {
             case c: return .copySelected
             case delete: return .deleteSelected
             case t: return .translateSelected
+            case returnKey, keypadEnter: return .pasteMarked
+            case p: return .togglePin
+            case comma: return .openSettings
             case a: return .selectAllText
             case x: return .cutText
             case v: return .pasteText

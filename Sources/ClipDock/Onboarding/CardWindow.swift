@@ -38,5 +38,7 @@ final class CardWindow: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         window = nil
         onClose?()
+        // Hand focus back to the app Omar was using, so the next paste goes there.
+        DispatchQueue.main.async { NSApp.deactivate() }
     }
 }

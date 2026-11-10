@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var capture: CaptureController?
     private var translation: TranslationService?
     private var popup: PopupController?
+    private var settings: SettingsWindowController?
+    private var maintenance: HistoryMaintenance?
     private var statusItem: StatusItemController?
     #if DEBUG
     private var debugHooks: DebugHooks?
@@ -42,12 +44,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let actions = ItemActions(database: database, history: history, paster: Paster(hud: hud), hud: hud, translation: translation)
         let thumbnails = ThumbnailCache(blobs: database.blobs)
         let popup = PopupController(history: history, icons: icons, thumbnails: thumbnails, actions: actions, translation: translation)
+        let maintenance = HistoryMaintenance(database: database, history: history, hud: hud)
+        let settings = SettingsWindowController(
+            icons: icons,
+            actions: .init(
+                openAccessibilitySettings: { accessibilityCard.show() },
+                openPasteSettings: { PasteboardAccess.openSettings() },
+                downloadLanguages: { languageCard.show() }
+            ),
+            languagesMissing: { languageCard.isMissing }
+        )
+        settings.onClose = { limitsChanged in
+            if limitsChanged { maintenance.applyRetention() }
+        }
+        popup.onOpenSettings = { settings.show() }
 
         let statusItem = StatusItemController(actions: .init(
-            isCapturing: { [weak capture] in capture?.isCapturing ?? false },
+            hasClipboardAccess: { [weak capture] in capture?.hasAccess ?? false },
+            pausedUntil: { [weak capture] in capture?.pausedUntil },
             canPaste: { AccessibilityAccess.isTrusted },
             needsLanguages: { languageCard.isMissing },
             openPopup: { [weak popup] in popup?.show() },
+            pause: { [weak capture] seconds in capture?.pause(for: seconds) },
+            resume: { [weak capture] in capture?.resumeCapture() },
+            clearHistory: { maintenance.confirmClearHistory() },
+            openSettings: { settings.show() },
             allowCapture: { [weak capture] in
                 pasteAccessCard.show(access: capture?.access ?? PasteboardAccess.behavior)
             },
@@ -58,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem?.refreshIcon()
             pasteAccessCard.update(access: access)
         }
+        capture.onPauseChange = { [weak statusItem] in statusItem?.refreshIcon() }
         languageCard.onReady = { hud.show("Translation is ready") }
 
         KeyboardShortcuts.onKeyDown(for: .openPopup) { [weak popup] in popup?.toggle() }
@@ -73,15 +95,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.capture = capture
         self.translation = translation
         self.popup = popup
+        self.settings = settings
+        self.maintenance = maintenance
         self.statusItem = statusItem
         #if DEBUG
         // Test-only remote control. Off unless launched with `open --env CLIPDOCK_DEBUG_HOOKS=1`,
         // because any local process could otherwise drive pastes through ClipDock's permissions.
         if ProcessInfo.processInfo.environment["CLIPDOCK_DEBUG_HOOKS"] == "1" {
-            debugHooks = DebugHooks(popup: popup, translation: translation)
+            debugHooks = DebugHooks(targets: .init(
+                popup: popup, translation: translation, settings: settings, maintenance: maintenance, capture: capture
+            ))
         }
         #endif
         Log.app.notice("launched accessibility=\(AccessibilityAccess.isTrusted, privacy: .public) secureInputCheck=\(SecureInput.isAvailable, privacy: .public)")
+        Log.app.notice("""
+            settings maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
+            days=\(AppSettings.retentionDays, privacy: .public) \
+            separator=\(AppSettings.pasteAllSeparator.rawValue, privacy: .public) \
+            ignoredApps=\(AppSettings.ignoredBundleIDs.count, privacy: .public) \
+            launchAtLogin=\(LaunchAtLogin.isEnabled, privacy: .public) \
+            paused=\(capture.pausedUntil != nil, privacy: .public)
+            """)
 
         let showedCard = showOnboardingIfNeeded(access: capture.access)
         Task {

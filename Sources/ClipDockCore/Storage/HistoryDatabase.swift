@@ -105,6 +105,27 @@ public final class HistoryDatabase: Sendable {
         }
     }
 
+    /// Pins or unpins an item. Pinned items never expire and survive "Clear history".
+    public func setPinned(_ pinned: Bool, id: Int64) throws -> ClipItem? {
+        try queue.write { db in
+            guard var item = try ClipItem.fetchOne(db, key: id) else { return nil }
+            item.isPinned = pinned
+            try item.update(db)
+            return item
+        }
+    }
+
+    /// "Clear history": deletes every unpinned item and its blob files. Returns the deleted IDs.
+    @discardableResult
+    public func clearUnpinned() throws -> [Int64] {
+        let result = try queue.write { db in
+            let ids = try Int64.fetchAll(db, ClipItem.select(ClipItem.Columns.id).filter(ClipItem.Columns.isPinned == false))
+            return try Self.deleteRows(ids, in: db)
+        }
+        result.orphanBlobs.forEach(blobs.remove)
+        return result.removedIDs
+    }
+
     /// Deletes items and any blob files nothing else references. Returns the deleted IDs.
     @discardableResult
     public func delete(ids: [Int64]) throws -> [Int64] {

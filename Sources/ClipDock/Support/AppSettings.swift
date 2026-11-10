@@ -13,6 +13,8 @@ enum AppSettings {
         static let didShowAccessibilityCard = "didShowAccessibilityCard"
         static let didPromptAccessibility = "didPromptAccessibility"
         static let didShowLanguageCard = "didShowLanguageCard"
+        static let pasteAllSeparator = "pasteAllSeparator"
+        static let pausedUntil = "pausedUntil"
     }
 
     static var ignoredBundleIDs: [String] {
@@ -20,12 +22,30 @@ enum AppSettings {
         set { defaults.set(newValue, forKey: Key.ignoredBundleIDs) }
     }
 
+    static var maxUnpinnedItems: Int {
+        get { defaults.object(forKey: Key.maxUnpinnedItems) as? Int ?? RetentionPolicy().maxUnpinned }
+        set { defaults.set(newValue, forKey: Key.maxUnpinnedItems) }
+    }
+
+    static var retentionDays: Int {
+        get { defaults.object(forKey: Key.retentionDays) as? Int ?? RetentionPolicy().maxAgeDays }
+        set { defaults.set(newValue, forKey: Key.retentionDays) }
+    }
+
     static var retention: RetentionPolicy {
-        let defaultPolicy = RetentionPolicy()
-        return RetentionPolicy(
-            maxUnpinned: defaults.object(forKey: Key.maxUnpinnedItems) as? Int ?? defaultPolicy.maxUnpinned,
-            maxAgeDays: defaults.object(forKey: Key.retentionDays) as? Int ?? defaultPolicy.maxAgeDays
-        )
+        RetentionPolicy(maxUnpinned: maxUnpinnedItems, maxAgeDays: retentionDays)
+    }
+
+    static var pasteAllSeparator: PasteAllSeparator {
+        get { defaults.string(forKey: Key.pasteAllSeparator).flatMap(PasteAllSeparator.init(rawValue:)) ?? .newline }
+        set { defaults.set(newValue.rawValue, forKey: Key.pasteAllSeparator) }
+    }
+
+    /// When paused capture resumes by itself. `.distantFuture` means "until resumed"; nil means
+    /// not paused. Kept across relaunches, so a pause isn't silently lifted.
+    static var pausedUntil: Date? {
+        get { defaults.object(forKey: Key.pausedUntil) as? Date }
+        set { defaults.set(newValue, forKey: Key.pausedUntil) }
     }
 
     static var didShowPasteAccessCard: Bool {

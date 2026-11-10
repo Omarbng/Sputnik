@@ -57,6 +57,39 @@ final class ItemActions {
         hud.show("Copied")
     }
 
+    /// ⌘↩: joins the items' text in the given order with the chosen separator, then pastes once.
+    func pasteAll(_ items: [ClipItem], closePopup: () -> Void) {
+        let separator = AppSettings.pasteAllSeparator
+        let (text, skipped) = PasteAll.join(items, separator: separator)
+        guard !text.isEmpty else {
+            closePopup()
+            hud.show("Nothing to paste as text", style: .error)
+            return
+        }
+        PasteboardWriter.write(text: text)
+        closePopup()
+        for item in items.reversed() { markUsed(item) }  // the first marked ends up on top
+        paster.pasteIntoFrontApp()
+        if skipped > 0 { hud.show("Images were left out") }
+        Log.paste.notice("""
+            paste all ids=\(items.compactMap(\.id).map(String.init).joined(separator: ","), privacy: .public) \
+            separator=\(separator.rawValue, privacy: .public) skipped=\(skipped, privacy: .public)
+            """)
+    }
+
+    /// ⌘P
+    func togglePin(_ item: ClipItem) {
+        guard let id = item.id else { return }
+        do {
+            if let updated = try database.setPinned(!item.isPinned, id: id) {
+                history.update(updated)
+                Log.storage.notice("pinned id=\(id, privacy: .public) pinned=\(updated.isPinned, privacy: .public)")
+            }
+        } catch {
+            Log.storage.error("pin failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     func delete(_ item: ClipItem) {
         guard let id = item.id else { return }
         do {

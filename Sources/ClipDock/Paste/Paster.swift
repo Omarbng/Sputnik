@@ -16,6 +16,13 @@ final class Paster {
     }
 
     func pasteIntoFrontApp() {
+        // Right after one of ClipDock's own windows, ClipDock can still be the active app.
+        // ⌘V would then land in ClipDock, so leave the item copied instead.
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            hud.show("Copied — press ⌘V", style: .error)
+            Log.paste.notice("fallback reason=clipDockFrontmost")
+            return
+        }
         guard AccessibilityAccess.isTrusted else {
             hud.show("Copied — press ⌘V", style: .error)
             Log.paste.notice("fallback reason=noAccessibility")

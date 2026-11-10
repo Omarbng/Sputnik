@@ -6,7 +6,7 @@
 - [x] **M2 — Popup + paste** (Claude tested it, see "M2 test results"; Omar still needs to press ⌘⇧V himself)
 - [x] **M3 — Translation** (works end to end with the stand-in translator. The real Apple
   engine needs the English and Russian downloads, which Omar must confirm in the macOS prompt)
-- [ ] M4 — Pins, paste all, settings
+- [x] **M4 — Pins, paste all, settings** (Claude tested it, see "M4 test results")
 - [ ] M5 — UI pass
 - [ ] M6 — Claude translation (optional)
 
@@ -101,6 +101,29 @@
 - **Database migration v2** adds `isTranslation`, shown as a "translated" badge.
 - **Debug:** `CLIPDOCK_FAKE_TRANSLATOR=1` swaps in a stand-in translator that tags each line
   (`[ru] …`), so the flow can be tested without the language files.
+- **Pins (⌘P):** pinned items sit in a Pinned section, never expire, don't count toward the
+  item limit, and survive Clear history.
+- **Multi-select:** Space marks the selected row, and marked rows show their order number.
+  ⌘↩ joins the marked items' text in that order with the separator (newline, space,
+  ", ", or nothing) and pastes once. Images are left out, with a HUD. Without marks, ⌘↩
+  acts like ↩. **Space always marks, as in the brief's key table**, so search queries
+  can't contain spaces and are effectively single-term.
+- **Settings window (⌘, or Settings…):**
+  - Shortcut recorders, history limit (50–5,000), and retention days (1–365). New limits
+    apply when the window closes, so stepping past a value by mistake doesn't delete anything.
+  - Paste-all separator, and ignored apps (add with a file picker, remove, restore defaults).
+  - Launch at login (`SMAppService.mainApp`).
+  - Permission and download status, with buttons.
+  - The Claude engine, key, and model fields arrive in M6.
+- **Menu:**
+  - Open ClipDock, then Pause Capture (15 min, 1 hour, until resumed) or Resume Capture
+    with "Paused until …".
+  - Clear History… (confirms first, and keeps pinned items), Settings…, Quit.
+  - Setup items appear only while something still needs a permission or download.
+- **Pause** is stored in `pausedUntil`, so it survives a relaunch. Copies made during a pause
+  are never read. The icon shows an empty clipboard while paused.
+- **Focus:** closing a ClipDock window calls `NSApp.deactivate()`, and `Paster` won't send
+  ⌘V while ClipDock itself is frontmost. It shows "Copied — press ⌘V" instead.
 - **Logging:** `notice` level, so messages are kept and visible in `log show`. They contain
   only ids, kinds, sizes, and skip reasons.
 - Dependencies get added in the milestone that needs them: GRDB 7.12 in M1,
@@ -164,7 +187,23 @@
 - Still to do once the languages are downloaded: the same run with Apple's engine
   (`MODE=real`), and the brief's TextEdit and Safari checks.
 
+## M4 test results (2026-11-10, scripted)
+- ⌘P pinned the top item.
+- Space on alpha → beta → gamma then ⌘↩ pasted `alpha\nbeta\ngamma` into the test app.
+  With the comma separator it pasted `beta, alpha, gamma`, in the marked order.
+- Pause until resumed: a copy during the pause wasn't saved, and one after Resume was.
+  A 2-second pause resumed by itself.
+- Clear history left only the pinned item. The DB-level unit test also checks that its blob
+  survives while the others are deleted.
+- ⌘, in the popup opened Settings, and closing it left the previous app in front.
+- Settings persisted across a relaunch: limits 400 and 20 days, separator, a sixth ignored
+  app, and a custom shortcut.
+- Unit tests: 65, including pinned items surviving the 30-day retention with a faked clock.
+- Omar's history and settings were backed up before the run and restored afterwards.
+
 ## Known issues
+- Not tested by Claude: the look of the Settings window, and turning on Launch at login
+  (it changes the login items, so that's left for Omar).
 - Not tested by Claude:
   - The physical ⌘⇧V press. The script opens the popup through the same `toggle()` call.
   - Notes, so as not to edit Omar's notes.

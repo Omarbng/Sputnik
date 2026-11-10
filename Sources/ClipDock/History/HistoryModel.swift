@@ -34,6 +34,17 @@ final class HistoryModel {
         }
     }
 
+    /// Replaces an item where it is (for example, after pinning), without moving it.
+    func update(_ item: ClipItem) {
+        guard let id = item.id, let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index] = item
+        searchKeys[id] = HistoryFilter.searchKey(for: item)
+    }
+
+    func item(id: Int64) -> ClipItem? {
+        items.first { $0.id == id }
+    }
+
     func remove(ids: [Int64]) {
         guard !ids.isEmpty else { return }
         let doomed = Set(ids)

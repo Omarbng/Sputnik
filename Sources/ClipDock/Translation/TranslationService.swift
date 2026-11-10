@@ -85,19 +85,19 @@ final class TranslationService {
 
     private func inPlace() async {
         let target = NSWorkspace.shared.frontmostApplication
-        capture.suspend()
+        capture.beginIgnoringChanges()
         let snapshot = PasteboardSnapshot.take()
 
         let selection: String
         switch await SelectionGrabber.copySelection(timeout: Self.copyTimeout) {
         case .nothingCopied:
-            capture.resume()
+            capture.endIgnoringChanges()
             hud.show("Select some text first", style: .error)
             Log.translate.notice("inPlace stopped reason=nothingCopied")
             return
         case .notText:
             snapshot.restore()
-            capture.resume()
+            capture.endIgnoringChanges()
             hud.show("Select some text first", style: .error)
             Log.translate.notice("inPlace stopped reason=notText")
             return
@@ -111,7 +111,7 @@ final class TranslationService {
             translation = try await translateShowingProgress(selection, direction: direction)
         } catch {
             snapshot.restore()
-            capture.resume()
+            capture.endIgnoringChanges()
             hud.show(describe(error), style: .error)
             return
         }
@@ -120,7 +120,7 @@ final class TranslationService {
         KeySender.commandV()
         try? await Task.sleep(for: Self.restoreDelay)
         snapshot.restore()
-        capture.resume()
+        capture.endIgnoringChanges()
         record(translation, from: target)
         Log.translate.notice("""
             inPlace direction=\(direction.rawValue, privacy: .public) \
@@ -130,11 +130,11 @@ final class TranslationService {
 
     private func showOnly() async {
         let source = NSWorkspace.shared.frontmostApplication
-        capture.suspend()
+        capture.beginIgnoringChanges()
         let snapshot = PasteboardSnapshot.take()
         let grabbed = await SelectionGrabber.copySelection(timeout: Self.copyTimeout)
         if grabbed != .nothingCopied { snapshot.restore() }
-        capture.resume()
+        capture.endIgnoringChanges()
 
         guard case .text(let selection) = grabbed else {
             hud.show("Select some text first", style: .error)

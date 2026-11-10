@@ -20,6 +20,9 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private var keyMonitor: Any?
     private var clickMonitor: Any?
 
+    /// ⌘, in the popup.
+    var onOpenSettings: (() -> Void)?
+
     var isVisible: Bool { panel.isVisible }
     var frame: CGRect { panel.frame }
 
@@ -116,6 +119,19 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             }
         case .translateSelected:
             translateSelected()
+        case .toggleMark:
+            if let id = model.selectedItem?.id { model.marks.toggle(id) }
+        case .pasteMarked:
+            if model.marks.isEmpty {
+                perform(.pasteSelected)
+            } else {
+                actions.pasteAll(model.markedItems, closePopup: { close(.picked) })
+            }
+        case .togglePin:
+            if let item = model.selectedItem { actions.togglePin(item) }
+        case .openSettings:
+            close(.other)
+            onOpenSettings?()
         case .deleteSelected:
             if let item = model.selectedItem {
                 actions.delete(item)

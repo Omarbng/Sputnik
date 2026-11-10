@@ -55,6 +55,7 @@ struct PopupListView: View {
                 ClipRowView(
                     item: item,
                     isSelected: item.id == selectedID,
+                    markNumber: item.id.flatMap { model.marks.number(for: $0) },
                     appIcon: icons.icon(for: item.sourceBundleID),
                     thumbnails: thumbnails
                 )
