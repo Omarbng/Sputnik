@@ -12,6 +12,7 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.12.0"),
+        .package(path: "Vendor/KeyboardShortcuts"),  // KeyboardShortcuts 2.4.0, vendored (see its Package.swift)
     ],
     targets: [
         // Pure logic + storage. No AppKit, so it's unit-testable.
@@ -23,8 +24,12 @@ let package = Package(
         // The menu-bar app: AppKit/SwiftUI, pasteboard, windows.
         .executableTarget(
             name: "ClipDock",
-            dependencies: ["ClipDockCore"],
-            path: "Sources/ClipDock"
+            dependencies: [
+                "ClipDockCore",
+                .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
+            ],
+            path: "Sources/ClipDock",
+            swiftSettings: [.define("DEBUG", .when(configuration: .debug))]
         ),
         .testTarget(
             name: "ClipDockCoreTests",

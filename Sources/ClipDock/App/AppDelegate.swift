@@ -1,35 +1,69 @@
 import AppKit
 import ClipDockCore
+@preconcurrency import KeyboardShortcuts
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let history = HistoryModel()
-    private let accessCard = PasteAccessWindowController()
+    private let hud = HUDController()
+    private let icons = AppIconCache()
+    private let pasteAccessCard = PasteAccessWindowController()
+    private let accessibilityCard = AccessibilityCardController()
     private var capture: CaptureController?
+    private var popup: PopupController?
     private var statusItem: StatusItemController?
+    #if DEBUG
+    private var debugHooks: DebugHooks?
+    #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let database = openDatabase() else { return }
 
         let history = self.history
-        let accessCard = self.accessCard
+        let pasteAccessCard = self.pasteAccessCard
+        let accessibilityCard = self.accessibilityCard
+
         let pipeline = CapturePipeline(database: database) { change in history.apply(change) }
         let capture = CaptureController(pipeline: pipeline)
-        let statusItem = StatusItemController(
-            history: history,
+        let actions = ItemActions(database: database, history: history, paster: Paster(hud: hud), hud: hud)
+        let thumbnails = ThumbnailCache(blobs: database.blobs)
+        let popup = PopupController(history: history, icons: icons, thumbnails: thumbnails, actions: actions)
+
+        let statusItem = StatusItemController(actions: .init(
             isCapturing: { [weak capture] in capture?.isCapturing ?? false },
-            onAllowAccess: { [weak capture] in accessCard.show(access: capture?.access ?? PasteboardAccess.behavior) }
-        )
+            canPaste: { AccessibilityAccess.isTrusted },
+            openPopup: { [weak popup] in popup?.show() },
+            allowCapture: { [weak capture] in
+                pasteAccessCard.show(access: capture?.access ?? PasteboardAccess.behavior)
+            },
+            allowPasting: { accessibilityCard.show() }
+        ))
         capture.onAccessChange = { [weak statusItem] access in
             statusItem?.refreshIcon()
-            accessCard.update(access: access)
+            pasteAccessCard.update(access: access)
+        }
+        KeyboardShortcuts.onKeyDown(for: .openPopup) { [weak popup] in
+            popup?.toggle()
         }
 
         capture.start()
         statusItem.refreshIcon()
+        warmCaches(thumbnails: thumbnails)
+        DispatchQueue.main.async { popup.prewarm() }
+
         self.capture = capture
+        self.popup = popup
         self.statusItem = statusItem
-        showAccessCardIfNeeded(access: capture.access)
+        #if DEBUG
+        // Test-only remote control. Off unless launched with `open --env CLIPDOCK_DEBUG_HOOKS=1`,
+        // because any local process could otherwise drive pastes through ClipDock's permissions.
+        if ProcessInfo.processInfo.environment["CLIPDOCK_DEBUG_HOOKS"] == "1" {
+            debugHooks = DebugHooks(popup: popup)
+        }
+        #endif
+        Log.app.notice("launched accessibility=\(AccessibilityAccess.isTrusted, privacy: .public) secureInputCheck=\(SecureInput.isAvailable, privacy: .public)")
+
+        showOnboardingIfNeeded(access: capture.access)
     }
 
     private func openDatabase() -> HistoryDatabase? {
@@ -50,10 +84,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The card appears on its own once. After that it's in the menu while capture is off.
-    private func showAccessCardIfNeeded(access: NSPasteboard.AccessBehavior) {
-        guard access != .alwaysAllow, !AppSettings.didShowPasteAccessCard else { return }
-        AppSettings.didShowPasteAccessCard = true
-        accessCard.show(access: access)
+    /// Looks up app icons and first thumbnails now, so the first popup open is as fast as later ones.
+    private func warmCaches(thumbnails: ThumbnailCache) {
+        let recent = history.items.prefix(50)
+        icons.warm(recent.map(\.sourceBundleID))
+        let imageBlobs = recent.compactMap(\.imageBlob).prefix(8)
+        Task {
+            for blob in imageBlobs { _ = await thumbnails.load(blob) }
+        }
+    }
+
+    /// Each card appears on its own once. After that, the menu offers it while it's needed.
+    private func showOnboardingIfNeeded(access: NSPasteboard.AccessBehavior) {
+        if access != .alwaysAllow, !AppSettings.didShowPasteAccessCard {
+            AppSettings.didShowPasteAccessCard = true
+            pasteAccessCard.show(access: access)
+        } else if !AccessibilityAccess.isTrusted, !AppSettings.didShowAccessibilityCard {
+            AppSettings.didShowAccessibilityCard = true
+            accessibilityCard.show()
+        }
     }
 }

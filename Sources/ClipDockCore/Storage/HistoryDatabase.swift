@@ -93,28 +93,44 @@ public final class HistoryDatabase: Sendable {
         return swept.removedIDs
     }
 
+    /// Marks an item as just used (pasted or copied from history), which moves it to the top.
+    public func touch(id: Int64, now: Date) throws -> ClipItem? {
+        try queue.write { db in
+            guard var item = try ClipItem.fetchOne(db, key: id) else { return nil }
+            item.lastUsedAt = now
+            try item.update(db)
+            return item
+        }
+    }
+
+    /// Deletes items and any blob files nothing else references. Returns the deleted IDs.
+    @discardableResult
+    public func delete(ids: [Int64]) throws -> [Int64] {
+        let result = try queue.write { db in try Self.deleteRows(ids, in: db) }
+        result.orphanBlobs.forEach(blobs.remove)
+        return result.removedIDs
+    }
+
     // MARK: - Private
 
-    private static func sweep(
-        _ policy: RetentionPolicy, now: Date, in db: Database
-    ) throws -> (removedIDs: [Int64], orphanBlobs: [String]) {
-        let items = try ClipItem.fetchAll(db)
-        let ids = policy.expiredIDs(in: items, now: now)
-        guard !ids.isEmpty else { return ([], []) }
+    private typealias Deletion = (removedIDs: [Int64], orphanBlobs: [String])
 
-        let idSet = Set(ids)
-        let blobNames = Set(
-            items
-                .filter { $0.id.map(idSet.contains) ?? false }
-                .flatMap { [$0.imageBlob, $0.rtfBlob].compactMap { $0 } }
-        )
+    private static func sweep(_ policy: RetentionPolicy, now: Date, in db: Database) throws -> Deletion {
+        let ids = policy.expiredIDs(in: try ClipItem.fetchAll(db), now: now)
+        return try deleteRows(ids, in: db)
+    }
+
+    private static func deleteRows(_ ids: [Int64], in db: Database) throws -> Deletion {
+        guard !ids.isEmpty else { return ([], []) }
+        let doomed = try ClipItem.fetchAll(db, keys: ids)
+        let blobNames = Set(doomed.flatMap { [$0.imageBlob, $0.rtfBlob].compactMap { $0 } })
         _ = try ClipItem.deleteAll(db, keys: ids)
         let orphans = try blobNames.filter { name in
             try ClipItem
                 .filter(ClipItem.Columns.imageBlob == name || ClipItem.Columns.rtfBlob == name)
                 .fetchCount(db) == 0
         }
-        return (ids, Array(orphans))
+        return (doomed.compactMap(\.id), Array(orphans))
     }
 
     private static var migrator: DatabaseMigrator {

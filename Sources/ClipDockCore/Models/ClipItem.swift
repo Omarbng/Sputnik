@@ -46,10 +46,11 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
     }
 
     /// One-line label: first non-empty line of text, file names, or "Image".
+    /// Only the start of the text is scanned, so huge items stay cheap to render.
     public var title: String {
         switch kind {
         case .text, .url:
-            let lines = (text ?? "").split(whereSeparator: \.isNewline)
+            let lines = (text ?? "").prefix(1_000).split(whereSeparator: \.isNewline)
             let first = lines.lazy
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .first { !$0.isEmpty }

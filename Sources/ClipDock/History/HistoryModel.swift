@@ -8,17 +8,36 @@ import Observation
 final class HistoryModel {
     private(set) var items: [ClipItem] = []
 
+    /// Precomputed search keys by item ID, kept in step with `items`.
+    @ObservationIgnored private(set) var searchKeys: [Int64: String] = [:]
+
     func replaceAll(with items: [ClipItem]) {
         self.items = items
+        searchKeys = Dictionary(
+            items.compactMap { item in item.id.map { ($0, HistoryFilter.searchKey(for: item)) } },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
-    /// Applies one stored capture: the item goes to the top and expired items drop out.
+    /// Applies one stored capture: expired items drop out and the item goes to the top.
     func apply(_ change: HistoryChange) {
-        let removed = Set(change.removedIDs)
-        items.removeAll { item in
-            guard let id = item.id else { return true }
-            return id == change.item.id || removed.contains(id)
+        remove(ids: change.removedIDs)
+        moveToTop(change.item)
+    }
+
+    /// Puts a new or updated item at the top.
+    func moveToTop(_ item: ClipItem) {
+        items.removeAll { $0.id == item.id }
+        items.insert(item, at: 0)
+        if let id = item.id {
+            searchKeys[id] = HistoryFilter.searchKey(for: item)
         }
-        items.insert(change.item, at: 0)
+    }
+
+    func remove(ids: [Int64]) {
+        guard !ids.isEmpty else { return }
+        let doomed = Set(ids)
+        items.removeAll { item in item.id.map(doomed.contains) ?? true }
+        for id in ids { searchKeys[id] = nil }
     }
 }

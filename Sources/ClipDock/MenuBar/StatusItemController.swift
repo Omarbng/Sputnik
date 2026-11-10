@@ -1,18 +1,22 @@
 import AppKit
-import ClipDockCore
+@preconcurrency import KeyboardShortcuts
 
 /// Owns the menu-bar icon and its menu.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    private let history: HistoryModel
-    private let isCapturing: () -> Bool
-    private let onAllowAccess: () -> Void
+    struct Actions {
+        var isCapturing: () -> Bool
+        var canPaste: () -> Bool
+        var openPopup: () -> Void
+        var allowCapture: () -> Void
+        var allowPasting: () -> Void
+    }
 
-    init(history: HistoryModel, isCapturing: @escaping () -> Bool, onAllowAccess: @escaping () -> Void) {
-        self.history = history
-        self.isCapturing = isCapturing
-        self.onAllowAccess = onAllowAccess
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let actions: Actions
+
+    init(actions: Actions) {
+        self.actions = actions
         super.init()
         let menu = NSMenu()
         menu.delegate = self
@@ -23,7 +27,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// Full clipboard while capturing, empty clipboard while capture is off.
     func refreshIcon() {
         let image = NSImage(
-            systemSymbolName: isCapturing() ? "doc.on.clipboard" : "clipboard",
+            systemSymbolName: actions.isCapturing() ? "doc.on.clipboard" : "clipboard",
             accessibilityDescription: "ClipDock"
         )
         image?.isTemplate = true
@@ -35,24 +39,22 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        if !isCapturing() {
-            let allow = NSMenuItem(
-                title: "Capture Off — Allow Clipboard Access…", action: #selector(allowAccess), keyEquivalent: ""
-            )
-            allow.target = self
+        var needsSeparator = false
+        if !actions.isCapturing() {
+            menu.addItem(item("Capture Off — Allow Clipboard Access…", #selector(allowCapture)))
+            needsSeparator = true
+        }
+        if !actions.canPaste() {
+            let allow = item("Allow Pasting…", #selector(allowPasting))
+            allow.subtitle = "Needed to paste with ⌘V for you"
             menu.addItem(allow)
-            menu.addItem(.separator())
+            needsSeparator = true
         }
+        if needsSeparator { menu.addItem(.separator()) }
 
-        // Temporary (M1): the last 5 captures, to check capture. The popup replaces this in M2.
-        menu.addItem(.sectionHeader(title: "Recent"))
-        let recent = history.items.prefix(5)
-        if recent.isEmpty {
-            menu.addItem(NSMenuItem(title: "Nothing yet", action: nil, keyEquivalent: ""))
-        }
-        for item in recent {
-            menu.addItem(recentMenuItem(for: item))
-        }
+        let open = item("Open ClipDock", #selector(openPopup))
+        open.setShortcut(for: .openPopup)
+        menu.addItem(open)
 
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit ClipDock", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -60,30 +62,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     // MARK: Private
 
-    private func recentMenuItem(for item: ClipItem) -> NSMenuItem {
-        let title = item.title
-        let shortTitle = title.count > 60 ? title.prefix(60) + "…" : title
-        let menuItem = NSMenuItem(title: shortTitle.isEmpty ? "(blank)" : String(shortTitle), action: #selector(noop), keyEquivalent: "")
-        menuItem.target = self
-        menuItem.image = NSImage(systemSymbolName: Self.glyph(for: item.kind), accessibilityDescription: item.kind.rawValue)
-        menuItem.subtitle = [item.sourceAppName, RelativeTime.short(item.lastUsedAt)]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-        return menuItem
+    private func item(_ title: String, _ action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        return item
     }
 
-    private static func glyph(for kind: ClipKind) -> String {
-        switch kind {
-        case .text: "text.alignleft"
-        case .url: "link"
-        case .image: "photo"
-        case .file: "doc"
-        }
-    }
-
-    @objc private func allowAccess() {
-        onAllowAccess()
-    }
-
-    @objc private func noop() {}
+    @objc private func openPopup() { actions.openPopup() }
+    @objc private func allowCapture() { actions.allowCapture() }
+    @objc private func allowPasting() { actions.allowPasting() }
 }

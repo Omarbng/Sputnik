@@ -1,44 +1,31 @@
 import AppKit
-import SwiftUI
 
-/// Shows the paste-permission card in a small window. It closes itself once access is allowed.
+/// Shows the paste-permission card. It closes itself once access is allowed.
 @MainActor
 final class PasteAccessWindowController {
-    private var window: NSWindow?
+    private let card = CardWindow()
 
     func show(access: NSPasteboard.AccessBehavior) {
         guard access != .alwaysAllow else { return }
-        if window == nil {
-            let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
-            window.title = "ClipDock"
-            window.isReleasedWhenClosed = false
-            self.window = window
-        }
-        update(access: access)
-        window?.center()
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        card.show(view(for: access))
     }
 
     /// Re-renders for a new permission state. Does nothing if the card isn't showing.
     func update(access: NSPasteboard.AccessBehavior) {
-        guard let window else { return }
-        guard access != .alwaysAllow else {
-            close()
-            return
+        guard card.isShowing else { return }
+        if access == .alwaysAllow {
+            card.close()
+        } else {
+            card.setContent(view(for: access))
         }
-        let controller = NSHostingController(rootView: PasteAccessCardView(
+    }
+
+    private func view(for access: NSPasteboard.AccessBehavior) -> PasteAccessCardView {
+        PasteAccessCardView(
             access: access,
             onContinue: { PasteboardAccess.requestListing() },
             onOpenSettings: { PasteboardAccess.openSettings() },
-            onDismiss: { [weak self] in self?.close() }
-        ))
-        controller.sizingOptions = .preferredContentSize
-        window.contentViewController = controller
-    }
-
-    func close() {
-        window?.close()
-        window = nil
+            onDismiss: { [card] in card.close() }
+        )
     }
 }
