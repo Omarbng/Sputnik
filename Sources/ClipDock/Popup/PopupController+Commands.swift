@@ -1,0 +1,194 @@
+import AppKit
+import ClipDockCore
+
+/// What the list's keys, the actions menu, and the row buttons do.
+extension PopupController {
+    func perform(_ command: PopupCommand) {
+        switch command {
+        case .close:
+            close(.escape)
+        case .moveUp:
+            model.moveSelection(by: -1)
+        case .moveDown:
+            model.moveSelection(by: 1)
+        case .pasteSelected:
+            if let text = model.selectedTranslation {
+                actions.pasteTranslation(text, closePopup: { close(.picked) })
+            } else if let item = model.selectedItem {
+                paste(item)
+            }
+        case .pastePlain:
+            // Works on any text, formatted or not; images and secrets get a hint instead.
+            if let item = model.selectedItem { actions.pastePlain(item, closePopup: { close(.picked) }) }
+        case .pasteNumber(let number):
+            if let item = model.item(at: number - 1) { paste(item) }
+        case .copySelected:
+            if let text = model.selectedTranslation {
+                actions.copyTranslation(text, closePopup: { close(.picked) })
+            } else if let item = model.selectedItem {
+                actions.copy(item, closePopup: { close(.picked) })
+            }
+        case .translateSelected:
+            translateSelected()
+        case .toggleMark:
+            guard let item = model.selectedItem, let id = item.id else { break }
+            if item.isSecret {
+                actions.notify("Secrets paste one at a time")
+            } else {
+                model.marks.toggle(id)
+            }
+        case .pasteMarked:
+            if model.marks.isEmpty {
+                perform(.pasteSelected)
+            } else {
+                actions.pasteAll(model.markedItems, closePopup: { close(.picked) })
+            }
+        case .togglePin:
+            if let item = model.selectedItem { run(.togglePin, on: item) }
+        case .openSettings:
+            close(.other)
+            onOpenSettings?()
+        case .deleteSelected:
+            if let item = model.selectedItem { requestDelete(item) }
+        case .showActions:
+            if let item = model.selectedItem { showActions(for: item) }
+        case .openSelected:
+            if let item = model.selectedItem { run(.open, on: item) }
+        case .editSelected:
+            if let item = model.selectedItem { run(.edit, on: item) }
+        case .newSaved:
+            openEditor(for: nil)
+        case .switchScope:
+            model.scope = model.scope == .history ? .saved : .history
+        case .selectAllText:
+            searchField.currentEditor()?.selectAll(nil)
+        case .cutText:
+            searchField.currentEditor()?.cut(nil)
+        case .pasteText:
+            searchField.currentEditor()?.paste(nil)
+        }
+    }
+
+    /// Keys while the actions menu is open: ↑↓ move, ↩ runs, Esc closes the menu (not the
+    /// popup). Any other shortcut closes the menu and runs as usual.
+    func handleInMenu(_ command: PopupCommand) -> Bool {
+        guard let menu = model.actionMenu, let item = model.actionMenuItem else {
+            model.actionMenu = nil
+            return handle(command)
+        }
+        switch command {
+        case .close:
+            model.actionMenu = nil
+        case .moveUp:
+            model.moveActionHighlight(by: -1)
+        case .moveDown:
+            model.moveActionHighlight(by: 1)
+        case .pasteSelected:
+            run(menu.actions[menu.highlighted], on: item)
+        case .toggleMark, .switchScope:
+            break
+        default:
+            model.actionMenu = nil
+            return handle(command)
+        }
+        return true
+    }
+
+    func showActions(for item: ClipItem) {
+        guard let id = item.id else { return }
+        model.select(item)
+        model.pendingDeleteID = nil
+        model.isCollapsed = false
+        model.actionMenu = ActionMenuState(itemID: id, actions: ClipAction.available(for: item))
+    }
+
+    /// Runs an action on an item, from the menu, a shortcut, or a button.
+    func run(_ action: ClipAction, on item: ClipItem) {
+        model.actionMenu = nil
+        guard ClipAction.available(for: item).contains(action) else {
+            actions.notify(Self.unavailableMessage(action, item))
+            return
+        }
+        model.select(item)
+        switch action {
+        case .paste:
+            paste(item)
+        case .pastePlain:
+            actions.pastePlain(item, closePopup: { close(.picked) })
+        case .copy:
+            actions.copy(item, closePopup: { close(.picked) })
+        case .edit:
+            openEditor(for: item)
+        case .translate:
+            translateSelected()
+        case .open:
+            actions.open(item, closePopup: { close(.picked) })
+        case .togglePin:
+            actions.togglePin(item)
+            model.clampSelection()
+        case .uppercase, .lowercase, .tidy:
+            pasteCleaned(item, action)
+        case .delete:
+            requestDelete(item)
+        }
+    }
+
+    /// Plain history items go at once. Saved items, which you can't copy again, ask first:
+    /// the row shows "Delete?" until a second ⌘⌫ or click.
+    func requestDelete(_ item: ClipItem) {
+        guard let id = item.id else { return }
+        model.actionMenu = nil
+        if item.isPinned, model.pendingDeleteID != id {
+            model.select(item)
+            model.pendingDeleteID = id
+            return
+        }
+        model.pendingDeleteID = nil
+        actions.delete(item)
+        model.clampSelection()
+    }
+
+    func paste(_ item: ClipItem) {
+        actions.paste(item, closePopup: { close(.picked) })
+    }
+
+    /// ⌘T: translate the selected row and show the result under it.
+    func translateSelected() {
+        guard let item = model.selectedItem, let id = item.id else { return }
+        guard model.translation?.itemID != id else { return }  // already shown or in progress
+        guard item.kind == .text || item.kind == .url, let text = item.text else {
+            model.translation = RowTranslation(itemID: id, state: .failed("Only text can be translated"))
+            return
+        }
+        model.translation = RowTranslation(itemID: id, state: .working)
+        Task {
+            let state: RowTranslation.State
+            do {
+                state = .done(try await translation.translate(text))
+            } catch {
+                state = .failed(translation.describe(error))
+            }
+            if model.translation?.itemID == id { model.translation?.state = state }
+        }
+    }
+
+    private func pasteCleaned(_ item: ClipItem, _ action: ClipAction) {
+        guard let text = item.text else { return }
+        let cleaned = switch action {
+        case .uppercase: TextCleanup.uppercased(text)
+        case .lowercase: TextCleanup.lowercased(text)
+        default: TextCleanup.tidied(text)
+        }
+        actions.pasteDerived(cleaned, closePopup: { close(.picked) })
+    }
+
+    private static func unavailableMessage(_ action: ClipAction, _ item: ClipItem) -> String {
+        switch action {
+        case .open: "Only links and files open"
+        case .edit: "Only text can be edited"
+        case .pastePlain: item.kind == .image ? "Images have no text" : "That item has no formatting"
+        case .togglePin: "Secrets are always saved"
+        default: "Not for this item"
+        }
+    }
+}

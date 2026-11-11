@@ -8,7 +8,18 @@ import ClipDockCore
 /// distributed notifications named `com.omar.clipdock.debug.<name>`:
 ///   toggle                         open or close the popup at the mouse cursor
 ///   query  {text}                  set the search text
-///   key    {keyCode, command}      press a key through the popup's keymap
+///   key    {keyCode, command, option, shift}  press a key through the popup's keymap (or the
+///                                  editor's, while it's open)
+///   action {text: name}            run a ClipAction (paste, edit, tidy, delete …) on the selected row
+///   editorSet {text, field: name|text|secret}  fill an editor field (test values only)
+///   editor {text: save|primary|cancel|toggleSecret}  an editor command
+///   hoverRow {text: id}            pretend the pointer is over a row ("" clears it)
+///   fieldCommand {text: insertNewline|insertTab|insertBacktab}  what ↩/⇥ do in the focused
+///                                  editor field, without posting a key (nothing can leak out)
+///   rowActions {text: id}          press a row's ⋯ button
+///   postKey {keyCode, command, option, shift}  post a real key press through the system
+///   postText {text}                post real typing (test values only)
+///   postMouse {text: move|left|right, x, y}  post a real mouse event (top-left screen coordinates)
 ///   state                          log the popup state (ids, counts, on-screen check)
 ///   translate                      same as the translate shortcut (double-tap ⌃)
 ///   card {text: replace|copy|close} press a button in the translation card
@@ -18,7 +29,7 @@ import ClipDockCore
 ///   clearHistoryNow                Clear history without the confirmation alert
 ///   pause {seconds} / resume       Pause capture (seconds < 0: until resumed)
 ///   settingsState                  log the saved settings
-///   dock {text: name}              press a dock button (history, pinned, translate, pasteAll, settings, toggle)
+///   dock {text: name}              press a dock button (history, saved, translate, pasteAll, settings, toggle)
 ///   hover {text: name}             pretend the pointer is over a dock button ("" clears it)
 ///   snapshot {text: path}          render the popup to a PNG (the behind-window blur doesn't render)
 ///   focused {text}                 log whether the focused text field contains `text`
@@ -26,6 +37,17 @@ import ClipDockCore
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
+    private weak var popup: PopupController?
+
+    /// Hooks that open UI, send input, or paste run only while the test target app is frontmost,
+    /// so a test can never type or paste into an app Omar is using.
+    static let testTarget = "com.omar.clipdock.testtarget"
+    private static let needsTestTarget: Set<String> = [
+        "toggle", "dock", "translate", "card", "postDoubleTap", "key", "action", "editor", "fieldCommand", "rowActions",
+        "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow",
+    ]
+    /// Posted keys and clicks must land in the popup itself.
+    private static let needsPopupKey: Set<String> = ["postKey", "postText", "postMouse"]
 
     struct Targets {
         let popup: PopupController
@@ -38,6 +60,7 @@ final class DebugHooks {
 
     init(targets: Targets) {
         let popup = targets.popup
+        self.popup = popup
         let translation = targets.translation
         observe("openSettings") { _ in targets.settings.show() }
         observe("closeSettings") { _ in targets.settings.close() }
@@ -81,10 +104,55 @@ final class DebugHooks {
         observe("query") { info in popup.setQuery(info.text ?? "") }
         observe("key") { info in
             guard let keyCode = info.keyCode else { return }
-            let modifiers: PopupKeymap.Modifiers = info.command ? .command : []
-            if let command = PopupKeymap.command(keyCode: keyCode, modifiers: modifiers), !popup.handle(command) {
+            var modifiers: PopupKeymap.Modifiers = []
+            if info.command { modifiers.insert(.command) }
+            if info.option { modifiers.insert(.option) }
+            if info.shift { modifiers.insert(.shift) }
+            if popup.model.editor != nil {
+                if let command = EditorKeymap.command(keyCode: keyCode, modifiers: modifiers) { popup.handleEditor(command) }
+            } else if let command = PopupKeymap.command(keyCode: keyCode, modifiers: modifiers), !popup.handle(command) {
                 Log.popup.notice("debug key passed to the search field")
             }
+        }
+        observe("action") { info in
+            guard let action = ClipAction(rawValue: info.text ?? ""), let item = popup.model.selectedItem else { return }
+            popup.run(action, on: item)
+        }
+        observe("editorSet") { info in
+            let fields = popup.editorFields
+            switch info.field {
+            case "name": fields.nameField.stringValue = info.text ?? ""
+            case "secret": fields.secretField.stringValue = info.text ?? ""
+            default: fields.textView.string = info.text ?? ""
+            }
+        }
+        observe("editor") { info in
+            let commands: [String: EditorCommand] = ["save": .save, "primary": .primary, "cancel": .cancel, "toggleSecret": .toggleSecret]
+            if let command = commands[info.text ?? ""] { popup.handleEditor(command) }
+        }
+        observe("hoverRow") { info in popup.model.hoveredItemID = info.text.flatMap { Int64($0) } }
+        observe("fieldCommand") { info in
+            guard let text = popup.panel.firstResponder as? NSTextView else { return }
+            text.doCommand(by: NSSelectorFromString((info.text ?? "") + ":"))
+        }
+        observe("rowActions") { info in
+            if let id = info.text.flatMap({ Int64($0) }), let item = popup.model.item(id: id) { popup.model.onShowActions?(item) }
+        }
+        observe("postKey") { info in
+            guard let keyCode = info.keyCode else { return }
+            var flags: CGEventFlags = []
+            if info.command { flags.insert(.maskCommand) }
+            if info.option { flags.insert(.maskAlternate) }
+            if info.shift { flags.insert(.maskShift) }
+            Self.postKey(CGKeyCode(keyCode), flags: flags)
+        }
+        observe("postText") { info in
+            guard let text = info.text else { return }
+            Task { await Self.postText(text) }
+        }
+        observe("postMouse") { info in
+            guard let x = info.x, let y = info.y else { return }
+            Self.postMouse(info.text ?? "move", at: CGPoint(x: x, y: y))
         }
         observe("state") { _ in
             let model = popup.model
@@ -97,7 +165,15 @@ final class DebugHooks {
                 selectedID=\(model.selectedItem?.id ?? -1, privacy: .public) \
                 ids=\(ids, privacy: .public) \
                 marks=\(model.marks.ids.map(String.init).joined(separator: ","), privacy: .public) \
-                pinned=\(model.sections.pinned.compactMap(\.id).map(String.init).joined(separator: ","), privacy: .public) \
+                saved=\(model.sections.saved.compactMap(\.id).map(String.init).joined(separator: ","), privacy: .public) \
+                scope=\(model.scope == .saved ? "saved" : "history", privacy: .public) \
+                kinds=\(model.sections.all.prefix(10).map(\.kind.rawValue).joined(separator: ","), privacy: .public) \
+                menu=\(model.actionMenu.map { "\($0.itemID):\($0.actions.map(\.rawValue).joined(separator: "+"))@\($0.highlighted)" } ?? "none", privacy: .public) \
+                editor=\(Self.describe(model.editor), privacy: .public) \
+                pendingDelete=\(model.pendingDeleteID ?? -1, privacy: .public) \
+                hoveredRow=\(model.hoveredItemID ?? -1, privacy: .public) \
+                firstResponder=\(Self.describe(popup.panel.firstResponder, popup), privacy: .public) \
+                fieldLengths=\(popup.editorFields.name.count, privacy: .public)/\(popup.editorFields.text.count, privacy: .public)/\(popup.editorFields.secret.count, privacy: .public) \
                 frame=\(NSStringFromRect(popup.frame), privacy: .public) \
                 onScreen=\(popup.isFullyOnScreen, privacy: .public) \
                 translation=\(Self.describe(model.translation), privacy: .public)
@@ -135,8 +211,65 @@ final class DebugHooks {
         }
     }
 
+    /// Mode and flags only, never what was typed.
+    private static func describe(_ editor: EditorState?) -> String {
+        guard let editor else { return "none" }
+        let mode = switch editor.mode {
+        case .new: "new"
+        case .edit(let id): "edit(\(id))"
+        }
+        return "\(mode),secret=\(editor.isSecret),name=\(editor.showsName),message=\(editor.message != nil)"
+    }
+
+    private static func describe(_ responder: NSResponder?, _ popup: PopupController) -> String {
+        let fields = popup.editorFields
+        guard let responder else { return "none" }
+        if let editor = responder as? NSText, let delegate = editor.delegate as? NSTextField {
+            if delegate === popup.searchField { return "search" }
+            if delegate === fields.nameField { return "name" }
+            if delegate === fields.secretField { return "secret" }
+        }
+        if responder === fields.textView { return "text" }
+        return String(describing: type(of: responder))
+    }
+
+    private static func postKey(_ key: CGKeyCode, flags: CGEventFlags) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
+            event?.flags = flags
+            event?.post(tap: .cghidEventTap)
+        }
+    }
+
+    private static func postText(_ text: String) async {
+        let source = CGEventSource(stateID: .hidSystemState)
+        for character in text {
+            let units = Array(String(character).utf16)
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down)
+                event?.keyboardSetUnicodeString(stringLength: units.count, unicodeString: units)
+                event?.post(tap: .cghidEventTap)
+            }
+            try? await Task.sleep(for: .milliseconds(15))
+        }
+    }
+
+    private static func postMouse(_ kind: String, at point: CGPoint) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        let types: [(CGEventType, CGMouseButton)] = switch kind {
+        case "left": [(.leftMouseDown, .left), (.leftMouseUp, .left)]
+        case "right": [(.rightMouseDown, .right), (.rightMouseUp, .right)]
+        default: [(.mouseMoved, .left)]
+        }
+        for (type, button) in types {
+            CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: button)?
+                .post(tap: .cghidEventTap)
+        }
+    }
+
     private static func dockItem(_ name: String?) -> DockItem? {
-        ["history": DockItem.history, "pinned": .pinned, "translate": .translate,
+        ["history": DockItem.history, "saved": .saved, "pinned": .saved, "translate": .translate,
          "pasteAll": .pasteAll, "settings": .settings, "toggle": .toggle][name ?? ""]
     }
 
@@ -165,25 +298,51 @@ final class DebugHooks {
     /// The few values the hooks read, copied out of `userInfo` so they can cross isolation.
     private struct Payload: Sendable {
         var text: String?
+        var field: String?
         var keyCode: UInt16?
         var command: Bool
+        var option: Bool
+        var shift: Bool
         var seconds: Double?
+        var x: Double?
+        var y: Double?
     }
 
     private func observe(_ name: String, _ handler: @escaping @MainActor (Payload) -> Void) {
         let token = DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.omar.clipdock.debug." + name), object: nil, queue: .main
-        ) { notification in
+        ) { [weak self] notification in
             let info = notification.userInfo ?? [:]
             let payload = Payload(
                 text: info["text"] as? String,
+                field: info["field"] as? String,
                 keyCode: (info["keyCode"] as? NSNumber)?.uint16Value,
                 command: info["command"] as? Bool ?? false,
-                seconds: (info["seconds"] as? NSNumber)?.doubleValue
+                option: info["option"] as? Bool ?? false,
+                shift: info["shift"] as? Bool ?? false,
+                seconds: (info["seconds"] as? NSNumber)?.doubleValue,
+                x: (info["x"] as? NSNumber)?.doubleValue,
+                y: (info["y"] as? NSNumber)?.doubleValue
             )
-            MainActor.assumeIsolated { handler(payload) }
+            MainActor.assumeIsolated {
+                guard self?.allows(name) == true else { return }
+                handler(payload)
+            }
         }
         tokens.append(token)
+    }
+
+    private func allows(_ name: String) -> Bool {
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+        if Self.needsTestTarget.contains(name), front != Self.testTarget {
+            Log.app.notice("debug refused \(name, privacy: .public): front=\(front, privacy: .public)")
+            return false
+        }
+        if Self.needsPopupKey.contains(name), popup?.panel.isKeyWindow != true {
+            Log.app.notice("debug refused \(name, privacy: .public): popup isn't key")
+            return false
+        }
+        return true
     }
 }
 #endif

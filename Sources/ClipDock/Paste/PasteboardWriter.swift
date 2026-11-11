@@ -6,6 +6,8 @@ import ClipDockCore
 @MainActor
 enum PasteboardWriter {
     static let internalType = NSPasteboard.PasteboardType(SkipRules.internalType)
+    /// nspasteboard.org's marker for passwords. Clipboard managers, ClipDock included, skip it.
+    static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
 
     /// Writes a history item with its original formats (RTF, PNG, file URLs).
     @discardableResult
@@ -20,6 +22,15 @@ enum PasteboardWriter {
     static func write(text: String, to pasteboard: NSPasteboard = .general) -> Bool {
         let item = NSPasteboardItem()
         item.setString(text, forType: .string)
+        return write([item], to: pasteboard)
+    }
+
+    /// Writes a secret's value, marked concealed so clipboard managers don't keep it.
+    @discardableResult
+    static func write(secret: String, to pasteboard: NSPasteboard = .general) -> Bool {
+        let item = NSPasteboardItem()
+        item.setString(secret, forType: .string)
+        item.setData(Data(), forType: concealedType)
         return write([item], to: pasteboard)
     }
 
@@ -56,6 +67,8 @@ enum PasteboardWriter {
                 pbItem.setString(URL(fileURLWithPath: String(path)).absoluteString, forType: .fileURL)
                 return pbItem
             }
+        case .secret:
+            return []  // a secret's value is only ever written by SecretActions, after Touch ID
         }
     }
 }

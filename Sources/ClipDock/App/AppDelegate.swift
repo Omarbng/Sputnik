@@ -44,9 +44,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 needsAccessibility: { accessibilityCard.show() }
             )
         )
-        let actions = ItemActions(database: database, history: history, paster: Paster(hud: hud), hud: hud, translation: translation)
+        let actions = ItemActions(
+            database: database, history: history, paster: Paster(hud: hud), hud: hud,
+            translation: translation, capture: capture, secrets: SecretActions(hud: hud, capture: capture)
+        )
+        let saved = SavedItems(database: database, history: history)
         let thumbnails = ThumbnailCache(blobs: database.blobs)
-        let popup = PopupController(history: history, icons: icons, thumbnails: thumbnails, actions: actions, translation: translation)
+        let popup = PopupController(
+            history: history, icons: icons, thumbnails: thumbnails,
+            actions: actions, saved: saved, translation: translation
+        )
         let maintenance = HistoryMaintenance(database: database, history: history, hud: hud)
         let settings = SettingsWindowController(
             icons: icons,

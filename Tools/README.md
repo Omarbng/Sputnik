@@ -11,6 +11,23 @@
 Before a test sends ⌘V, it must check that the intended app is frontmost. Otherwise the paste lands in
 whatever you're using at that moment.
 
+**Omar uses the Mac while tests run.** Keystrokes and pastes go to whatever app is frontmost when they're
+delivered, so a check made a moment earlier in a script isn't enough. Rules since 2026-11-11:
+
+- Drive the popup with the in-app hooks (`key`, `action`, `editor`, `editorSet`, `fieldCommand`, `query`).
+  They call the popup directly and post nothing to the system. The `postKey`/`postText`/`postMouse`
+  hooks do post real events: use them only when nobody is at the Mac.
+- The hooks that open UI or can paste are refused unless the test target app
+  (`com.omar.clipdock.testtarget`) is frontmost. Posting hooks also need the popup to be key.
+- Use a test build for anything that pastes: `CLIPDOCK_TEST_BUILD=1 ./run.sh`, then
+  `open --env CLIPDOCK_DEBUG_HOOKS=1 --env CLIPDOCK_TEST_TARGET_ONLY=1 --env CLIPDOCK_FAKE_AUTH=1 ~/Applications/ClipDock.app`.
+  It sends ⌘V/⌘C only while the test target is frontmost (checked right before sending), and
+  `CLIPDOCK_FAKE_AUTH=1` skips Touch ID for secrets. **Reinstall the everyday build (`./run.sh`) afterwards.**
+- Run bursts only after the Mac has been idle for a minute:
+  `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'`.
+- Posted Unicode-only key events are ignored by a freshly focused text field until one real key-code event
+  reaches it; send a harmless → first. (A physical keyboard always sends key codes.)
+
 Running the paste target as an app, so `open` brings it to the front:
 
 ```sh

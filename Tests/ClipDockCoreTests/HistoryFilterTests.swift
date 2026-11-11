@@ -19,14 +19,47 @@ struct HistoryFilterTests {
         ]
     }
 
-    func ids(_ query: String) -> [Int64] {
-        HistoryFilter.sections(of: items, query: query).all.compactMap(\.id)
+    func ids(_ query: String, scope: HistoryScope = .history) -> [Int64] {
+        HistoryFilter.sections(of: items, query: query, scope: scope).all.compactMap(\.id)
     }
 
-    @Test("An empty or blank query shows everything, pinned first")
+    @Test("History without a search shows only unsaved items, so ↩ pastes the latest copy")
     func emptyQuery() {
-        #expect(ids("") == [3, 1, 2, 4])
-        #expect(ids("   ") == [3, 1, 2, 4])
+        #expect(ids("") == [1, 2, 4])
+        #expect(ids("   ") == [1, 2, 4])
+    }
+
+    @Test("Searching History also finds saved items, listed first")
+    func searchIncludesSaved() {
+        #expect(ids("report") == [3])
+        #expect(ids("l") == [3, 1, 2])  // "quarterly report", then "Hello", "Telegram"
+        let sections = HistoryFilter.sections(of: items, query: "l")
+        #expect(sections.saved.compactMap(\.id) == [3])
+        #expect(sections.recent.compactMap(\.id) == [1, 2])
+    }
+
+    @Test("The Saved tab shows only saved items, with or without a search")
+    func savedScope() {
+        #expect(ids("", scope: .saved) == [3])
+        #expect(ids("report", scope: .saved) == [3])
+        #expect(ids("hello", scope: .saved).isEmpty)
+    }
+
+    @Test("Names are searched; a secret's search key never holds its value")
+    func namesAndSecrets() {
+        let named = ClipItem(
+            id: 7, kind: .text, text: "sk-live-123", contentHash: "7", byteSize: 1,
+            createdAt: referenceNow, lastUsedAt: referenceNow, isPinned: true, name: "OpenAI key"
+        )
+        let secret = ClipItem(
+            id: 8, kind: .secret, text: nil, contentHash: "secret:x", byteSize: 0,
+            createdAt: referenceNow, lastUsedAt: referenceNow, isPinned: true, name: "Bank PIN", secretRef: "x"
+        )
+        #expect(HistoryFilter.sections(of: [named, secret], query: "openai").all.compactMap(\.id) == [7])
+        #expect(HistoryFilter.sections(of: [named, secret], query: "bank").all.compactMap(\.id) == [8])
+        #expect(HistoryFilter.searchKey(for: secret) == "bank pin\nsecret\n")
+        #expect(named.displayTitle == "OpenAI key")
+        #expect(secret.displayTitle == "Bank PIN")
     }
 
     @Test("Matching ignores case, including Cyrillic")

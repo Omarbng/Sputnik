@@ -52,4 +52,51 @@ struct PopupKeymapTests {
         #expect(command(0x12, [.command, .shift]) == nil)
         #expect(command(0x08, .option) == nil)
     }
+
+    @Test("Actions menu keys: ⌘K, ⌥↩, ⌘O, ⌘E, ⌘N, and ⇥ for the tabs")
+    func actionKeys() {
+        #expect(command(0x28, .command) == .showActions)
+        #expect(command(0x24, .option) == .pastePlain)
+        #expect(command(0x4C, .option) == .pastePlain)
+        #expect(command(0x1F, .command) == .openSelected)
+        #expect(command(0x0E, .command) == .editSelected)
+        #expect(command(0x2D, .command) == .newSaved)
+        #expect(command(0x30) == .switchScope)
+        #expect(command(0x30, .shift) == .switchScope)
+        #expect(command(0x28) == nil)  // plain "k" types
+    }
+}
+
+@Suite("Editor keys")
+struct EditorKeymapTests {
+    func command(_ keyCode: UInt16, _ modifiers: PopupKeymap.Modifiers = []) -> EditorCommand? {
+        EditorKeymap.command(keyCode: keyCode, modifiers: modifiers)
+    }
+
+    @Test("Esc cancels; ⌘S saves; ⌘↩ is the main action; ⌘L toggles Secret")
+    func commands() {
+        #expect(command(0x35) == .cancel)
+        #expect(command(0x01, .command) == .save)
+        #expect(command(0x24, .command) == .primary)
+        #expect(command(0x25, .command) == .toggleSecret)
+    }
+
+    @Test("Text editing shortcuts work without an Edit menu")
+    func editing() {
+        #expect(command(0x00, .command) == .selectAll)
+        #expect(command(0x07, .command) == .cut)
+        #expect(command(0x08, .command) == .copy)
+        #expect(command(0x09, .command) == .paste)
+        #expect(command(0x06, .command) == .undo)
+        #expect(command(0x06, [.command, .shift]) == .redo)
+    }
+
+    @Test("Return, Space, arrows, and Tab go to the text fields")
+    func passThrough() {
+        #expect(command(0x24) == nil)
+        #expect(command(0x31) == nil)
+        #expect(command(0x7E) == nil)
+        #expect(command(0x30) == nil)
+        #expect(command(0x2D, .command) == nil)  // ⌘N does nothing while editing
+    }
 }

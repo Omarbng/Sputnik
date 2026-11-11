@@ -79,14 +79,14 @@ struct DockView: View {
     private func isActive(_ item: DockItem) -> Bool {
         switch item {
         case .history: model.scope == .history
-        case .pinned: model.scope == .pinned
+        case .saved: model.scope == .saved
         default: false
         }
     }
 
     private func showsBadge(_ item: DockItem) -> Bool {
         switch item {
-        case .pinned: model.hasPinned
+        case .saved: model.hasSaved
         case .pasteAll: !model.marks.isEmpty
         default: false
         }

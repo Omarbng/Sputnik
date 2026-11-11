@@ -11,6 +11,8 @@
   needs Omar's sign-off on the look and motion)
 - [x] **Shortcut change** (2026-11-11, Omar): Wispr-Flow-style double-taps replace the combos
   (see below)
+- [x] **M5b — Clip actions and Saved items** (2026-11-11, Omar's request; see "M5b test
+  results"). Needs Omar to try Touch ID, right-click, and the row buttons himself.
 - [ ] M6 — Claude translation (optional; Omar hasn't decided yet)
 - [ ] **M7 — Dictation (planned, Omar's request on 2026-11-11):** after ClipDock is finished,
   write up what an on-device voice-dictation feature would take, in quality, effort, and
@@ -31,11 +33,15 @@
 - `Sources/ClipDock`: the app.
   - `Capture/`: watcher, reader, pipeline, and access.
   - `History/`: the in-memory model and item actions.
-  - `Popup/`: panel, controller, AppKit shell, and SwiftUI list.
+  - `Popup/`: panel, controller (split into core, `+Commands`, `+Editor`), AppKit shell, and
+    SwiftUI list. `Popup/Actions/` is the actions menu; `Popup/Editor/` is the ⌘N/⌘E editor.
+  - `Saved/`: saved items (`SavedItems`), secrets (`SecretStore` for the Keychain,
+    `SecretActions` for paste/copy, `OwnerCheck` for Touch ID).
   - `Paste/`: writer, ⌘V sender, secure input, and Accessibility.
   - `HUD/`, `Onboarding/` (cards), `MenuBar/`, `Hotkeys/`, `Images/` (icon and thumbnail caches).
   - `Debug/`: debug-build-only hooks.
-- `Sources/ClipDockCore` also holds `PopupPlacement`, `PopupKeymap`, `HistoryFilter`, and `Thumbnailer`.
+- `Sources/ClipDockCore` also holds `PopupPlacement`, `PopupKeymap`, `EditorKeymap`, `ClipAction`,
+  `HistoryFilter` (with the History/Saved scopes), `TextCleanup`, and `Thumbnailer`.
 - `Tests/ClipDockCoreTests`: dedupe, skip rules, retention, placement, search, keymap, and touch/delete.
 - `Vendor/KeyboardShortcuts`: a patched copy of the library (see below).
 - `Tools/`: test helpers.
@@ -269,7 +275,64 @@
 - Popup lifetime check: double-tap and toggle opens behaved the same. One early close
   (`resignedKey`) lined up with another app taking focus while Omar was using the Mac.
 
+## M5b test results (2026-11-11, test build, in-app hooks, CDTarget test app)
+- 96 unit tests pass (23 new: saved-item storage, the actions list, clean-up, editor keys,
+  the History/Saved scopes, and secrets in search and Paste all).
+- ⌘N with a name and text saved a pinned, named item and switched to Saved. ⌘N, ⌘L, name,
+  value, then ↩ (or ⌘S) saved a secret: the row's text is NULL, the value is in the Keychain,
+  and it's in none of ClipDock's files, its preferences, or its logs.
+- Pasting a secret put its value in the test app; the clipboard afterwards was byte-for-byte
+  what it was before. Copying one marked it `ConcealedType`, history didn't capture it, and
+  31 s later the clipboard was back to what it was before the copy.
+- ⌘K opened the menu with the expected actions; ↑↓ moved; Esc closed only the menu.
+- ⌥↩ on an RTF item pasted text only (no RTF on the pasteboard). "Paste without Extra Spaces"
+  pasted joined paragraphs and added them to history. ⌘E then ⌘↩ pasted the edit and kept the
+  original; ⌘E then ⌘S replaced the text and dropped the RTF blob.
+- ⌘⌫ deleted a plain item at once; a saved item showed "Delete?" and went on the second ⌘⌫;
+  deleting a secret removed its Keychain item. Space on a secret didn't mark it.
+- Snapshots: the Saved tab (lock and dots for secrets, ⋯ and trash on hover), the menu, and
+  the "Delete?" pill look as designed. The menu was 13 pt too tall for ten actions; rows are
+  now 24 pt.
+- Omar's history, clipboard, and Keychain were left as they were: test rows and the test
+  Keychain items were removed, and the everyday build was reinstalled.
+
+## M5b decisions (2026-11-11)
+- **Omar chose** (AskUserQuestion): all four extra actions (plain text, open/show, edit, clean
+  up); a Saved tab with Keychain secrets; saved items in every search; and "picking acts,
+  nothing opens", so the editor lives inside the popup.
+- **History without a search shows only unsaved items.** Saved items join any search, under
+  "Saved". Otherwise a long Saved list would push the latest copy off ↩ and ⌘1.
+- **Saved = pinned.** Typed-in items and secrets are stored pinned, so retention and Clear
+  history already keep them. New columns `name` and `secretRef` (migration `v3-saved-items`),
+  and a new `ClipKind.secret`, so every `switch` over kinds has to handle secrets.
+- **Secrets:** the value is a generic-password item in the login Keychain (service
+  `com.omar.clipdock.saved`, account = a UUID in `secretRef`). The row's `text` is NULL and its
+  content hash is `secret:<UUID>`, so no hash of the value is stored either.
+  - Touch ID is an app-level check (`LAContext`, `.deviceOwnerAuthentication`), asked on every
+    paste and copy. The data-protection Keychain (which could enforce it) needs a provisioning
+    profile, which a self-signed app can't have.
+  - Pasting restores the old clipboard after 500 ms; copying clears it after 30 s unless
+    something else was copied. Both writes carry `org.nspasteboard.ConcealedType`.
+- **⌥↩** works on any text; Paste as Plain Text appears in the menu only for text that has
+  formatting. Files get "Paste as Path".
+- **Clean-up and edited pastes** are added to history (what's now in the document), with the
+  target app as the source.
+- **Deleting a saved item asks first** (second ⌘⌫ or click), because typed-in items and
+  secrets can't be copied again.
+- **⇥ switches History/Saved**, so the Saved tab works without the mouse.
+- **Test builds** (`CLIPDOCK_TEST_BUILD=1 ./run.sh`) compile in a Touch ID skip and a
+  "⌘V only into the test target" guard, both off unless launched with their environment
+  variables. The everyday build has neither.
+
 ## Known issues
+- **After a rebuild, the first use of each secret shows a Keychain password prompt**
+  ("ClipDock wants to use your confidential information…"). The self-signed certificate has
+  no Team ID, so the Keychain ties the item to the exact build. Choose **Always Allow**. It
+  doesn't happen between rebuilds.
+- Not tested by Claude (needs a person at the Mac): the real Touch ID prompt and whether focus
+  returns to the app afterwards (if it doesn't, the secret stays copied for 30 s), a real
+  right-click, clicking the row's ⋯ and trash buttons, and ⌘O (it opens a browser tab or a
+  Finder window).
 - Not tested by Claude: the motion itself (springs and fades, which snapshots can't show), and
   how the blur looks over real windows.
 - Not tested by Claude: the look of the Settings window, and turning on Launch at login

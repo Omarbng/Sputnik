@@ -29,7 +29,7 @@ public enum PasteAll {
     /// `skipped` counts them.
     public static func join(_ items: [ClipItem], separator: PasteAllSeparator) -> (text: String, skipped: Int) {
         let texts = items.compactMap { item -> String? in
-            item.kind == .image ? nil : item.text
+            item.kind == .image || item.kind == .secret ? nil : item.text
         }
         return (texts.joined(separator: separator.string), items.count - texts.count)
     }

@@ -4,6 +4,8 @@ public enum PopupCommand: Equatable, Sendable {
     case moveUp
     case moveDown
     case pasteSelected
+    /// ⌥↩: paste as plain text (no formatting), or a file's path.
+    case pastePlain
     /// ⌘1–⌘9: paste the Nth visible item (1-based).
     case pasteNumber(Int)
     case copySelected
@@ -18,6 +20,16 @@ public enum PopupCommand: Equatable, Sendable {
     case togglePin
     /// ⌘,
     case openSettings
+    /// ⌘K: the actions menu for the selected item.
+    case showActions
+    /// ⌘O: open a link, or show a file in Finder.
+    case openSelected
+    /// ⌘E: edit the selected item.
+    case editSelected
+    /// ⌘N: type in a new saved item.
+    case newSaved
+    /// ⇥: switch between History and Saved.
+    case switchScope
     // Editing in the search field. A menu-bar app has no Edit menu to supply these.
     case selectAllText
     case cutText
@@ -51,6 +63,14 @@ public enum PopupKeymap {
     static let p: UInt16 = 0x23
     static let comma: UInt16 = 0x2B
     static let space: UInt16 = 0x31
+    static let tab: UInt16 = 0x30
+    static let k: UInt16 = 0x28
+    static let o: UInt16 = 0x1F
+    static let e: UInt16 = 0x0E
+    static let n: UInt16 = 0x2D
+    static let s: UInt16 = 0x01
+    static let l: UInt16 = 0x25
+    static let z: UInt16 = 0x06
     static let digits: [UInt16: Int] = [
         0x12: 1, 0x13: 2, 0x14: 3, 0x15: 4, 0x17: 5, 0x16: 6, 0x1A: 7, 0x1C: 8, 0x19: 9,
     ]
@@ -64,8 +84,15 @@ public enum PopupKeymap {
             case upArrow: return .moveUp
             case downArrow: return .moveDown
             case space: return .toggleMark
+            case tab: return .switchScope
             default: return nil
             }
+        }
+        if modifiers == .option, keyCode == returnKey || keyCode == keypadEnter {
+            return .pastePlain
+        }
+        if modifiers == .shift, keyCode == tab {
+            return .switchScope
         }
         if modifiers == .command {
             if let number = digits[keyCode] { return .pasteNumber(number) }
@@ -76,6 +103,10 @@ public enum PopupKeymap {
             case returnKey, keypadEnter: return .pasteMarked
             case p: return .togglePin
             case comma: return .openSettings
+            case k: return .showActions
+            case o: return .openSelected
+            case e: return .editSelected
+            case n: return .newSaved
             case a: return .selectAllText
             case x: return .cutText
             case v: return .pasteText

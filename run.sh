@@ -11,6 +11,13 @@ SIGN_IDENTITY="ClipDock Dev"          # self-signed, stable across rebuilds (see
 INSTALL_DIR="$HOME/Applications"
 source ./swiftpm-env.sh
 SWIFT_FLAGS=(-c "$CONFIG" "${SWIFTPM_COMMON_FLAGS[@]}")
+# Test builds, for scripts only: launched with CLIPDOCK_FAKE_AUTH=1 they skip Touch ID, and
+# with CLIPDOCK_TEST_TARGET_ONLY=1 they send ⌘V/⌘C only into the test target app.
+# Never leave one installed: rebuild with plain ./run.sh afterwards.
+if [[ "${CLIPDOCK_TEST_BUILD:-}" == 1 ]]; then
+  echo "==> TEST BUILD (Touch ID can be skipped)"
+  SWIFT_FLAGS+=(-Xswiftc -DCLIPDOCK_TEST_BUILD)
+fi
 STAGE="$BUILD_ROOT/$APP_NAME.app"
 
 echo "==> swift build ($CONFIG)"

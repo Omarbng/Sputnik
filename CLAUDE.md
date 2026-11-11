@@ -59,16 +59,22 @@ combos (such as ⌘⇧V) can still be recorded there.
 |---|---|
 | typing | Filter the list |
 | ↑ ↓ | Move the selection |
+| ⇥ | Switch between History and Saved (added 2026-11-11) |
 | ↩ | Paste the selected item |
+| ⌥↩ | Paste as plain text, or a file's path (added 2026-11-11) |
 | ⌘1 – ⌘9 | Paste the Nth visible item |
 | Space | Add or remove the item from multi-select (shows order numbers 1, 2, 3…) |
 | ⌘↩ | Paste all selected items, in the order they were selected |
-| ⌘P | Pin or unpin |
+| ⌘K, or right-click a row | Actions menu for the item (section 4.9) (added 2026-11-11) |
+| ⌘P | Add to Saved, or remove from it |
 | ⌘T | Translate the selected item and show the result under it. ↩ pastes the translation. |
+| ⌘E | Edit the item: ⌘↩ pastes the edited text, ⌘S saves it, Esc cancels (added 2026-11-11) |
+| ⌘O | Open a link, or show a file in Finder (added 2026-11-11) |
+| ⌘N | Type in a new saved item; ⌘L in the editor makes it a secret (added 2026-11-11) |
 | ⌘C | Copy without pasting |
-| ⌘⌫ | Delete the item |
+| ⌘⌫ | Delete the item. A saved item asks first: press ⌘⌫ again. |
 | ⌘, | Open Settings |
-| Esc | Close |
+| Esc | Close (or close the actions menu or editor) |
 
 ---
 
@@ -109,7 +115,10 @@ combos (such as ⌘⇧V) can still be recorded there.
   - Measure the open time with `os_signpost` and print it in debug builds. The target is under 100 ms.
 - **Close** on Esc, a click outside, choosing an item, or focus loss.
 - **Search:** the search field is focused when the popup opens. Filtering is instant and case-insensitive, and matches the text and the source app name.
-- **Sections:** Pinned on top, then Recent.
+- **Sections:** ~~Pinned on top, then Recent.~~ **Changed 2026-11-11 (Omar chose "saved items
+  in every search"):** History shows recent copies only, so ↩ and ⌘1 always reach the latest
+  copy. While searching, matching saved items come first, under "Saved". The Saved tab lists
+  only saved items.
 - **Each row shows:**
   - a type glyph
   - the first line of text, an image thumbnail, or the file name
@@ -175,6 +184,31 @@ Keep it small, with these settings:
 - translation engine, API key, and model id
 - launch at login
 - **permission status:** Accessibility and Paste from Other Apps, each with an "Open Settings" button
+
+### 4.8 Saved items and secrets (added 2026-11-11, Omar)
+- The Pinned tab is now **Saved**. It holds pinned clips (⌘P), text Omar types in with ⌘N
+  (an optional name, such as "Office address"), and secrets.
+- **Secrets** (⌘N, then ⌘L): for passwords and API keys.
+  - The value goes in the login **Keychain** only. The database row holds just the name and a
+    Keychain reference, and the row shows dots instead of the value.
+  - Pasting or copying one asks for Touch ID (or the Mac password) every time.
+  - On the clipboard it's marked `org.nspasteboard.ConcealedType`, so clipboard managers skip
+    it. After a paste the previous clipboard comes back at once; a copy is cleared after 30 s.
+  - It's never translated, searched by value, joined in Paste all, or logged.
+- Saved items never expire and survive Clear history. Deleting one asks first.
+- The editor (⌘N, ⌘E) opens inside the popup in place of the list. Nothing else opens.
+
+### 4.9 Clip actions (added 2026-11-11, Omar)
+- **Row buttons:** under the pointer, a row shows ⋯ (the actions menu) and a trash button.
+- **Actions menu** (⌘K, a right-click, or ⋯), with the actions that fit the item:
+  - Paste; Paste as Plain Text (⌥↩, text with formatting) or Paste as Path (files)
+  - Copy; Edit… (⌘E); Translate (⌘T, text only)
+  - Open Link or Show in Finder (⌘O)
+  - Add to Saved or Remove from Saved (⌘P)
+  - Paste in UPPERCASE, Paste in lowercase, Paste without Extra Spaces (joins broken lines and
+    squeezes spaces, keeping paragraphs). The cleaned-up text is added to history.
+  - Delete (⌘⌫)
+- In the menu, ↑↓ move, ↩ runs, and Esc closes only the menu.
 
 ### 4.7 Privacy rules
 - All data stays local, and the app makes no network calls except in Claude mode.
@@ -247,7 +281,7 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 - **Structure:** the popup is the dock pill at the cursor, with a list card under it.
   - The card uses the same material, an 18 pt corner radius, and is about 360 pt wide.
   - Rows are 36 pt tall, with at most 8 visible.
-- **Dock icons, left to right:** History, Pinned, Translate (⌘T), Paste all (⌘↩), Settings (⌘,). The toggle sits pinned at the right, and collapsing hides the list card so only the dock is left.
+- **Dock icons, left to right:** History, Saved (was Pinned, renamed 2026-11-11), Translate (⌘T), Paste all (⌘↩), Settings (⌘,). The toggle sits pinned at the right, and collapsing hides the list card so only the dock is left.
 - **Tooltips:** each one shows the name and its shortcut chips, for example "Translate ⌘ T".
 - **Selected row:** a soft filled capsule that slides between rows (`matchedGeometryEffect`) with the tooltip-slide spring.
 - **HUDs** (Translating…, Copied, errors): a small pill at the cursor in the same material. It auto-dismisses after 600 ms, or after 1.5 s for errors.
@@ -319,6 +353,19 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 **Done when:**
 - [ ] Omar signs off on how it looks and moves.
 - [ ] The open time is still under 100 ms.
+
+### M5b — Clip actions and Saved items (added 2026-11-11, Omar)
+- Add the actions menu, the row buttons, the Saved tab with typed-in items and Keychain
+  secrets, the editor, and the new popup keys (sections 3, 4.8, 4.9).
+
+**Done when:**
+- [ ] ⌘K and a right-click open the actions menu, and each action works.
+- [ ] Hovering a row shows ⋯ and trash; deleting a saved item asks first.
+- [ ] ⌘N saves a named item; with ⌘L it's a secret that pastes after Touch ID, and the
+      clipboard afterwards matches what it was before.
+- [ ] The secret's value is in the Keychain and nowhere in ClipDock's files or logs.
+- [ ] ⌘E edits, then pastes (⌘↩) or saves (⌘S).
+- [ ] Unit tests pass for the actions list, text clean-up, keymaps, and saved-item storage.
 
 ### M6 — Claude translation mode (optional)
 - Add the Keychain-stored key, the engine choice, ⌃⌥⌘T, and the fallback to Apple.

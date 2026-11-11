@@ -18,6 +18,10 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
     public var isPinned: Bool
     /// Made by ClipDock's translation (shown with a "translated" badge).
     public var isTranslation: Bool
+    /// A name Omar gave a saved item, such as "OpenAI key". Shown instead of the content.
+    public var name: String?
+    /// For secrets: the Keychain account that holds the value.
+    public var secretRef: String?
 
     public init(
         id: Int64? = nil,
@@ -32,7 +36,9 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         createdAt: Date,
         lastUsedAt: Date,
         isPinned: Bool = false,
-        isTranslation: Bool = false
+        isTranslation: Bool = false,
+        name: String? = nil,
+        secretRef: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -47,6 +53,19 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         self.lastUsedAt = lastUsedAt
         self.isPinned = isPinned
         self.isTranslation = isTranslation
+        self.name = name
+        self.secretRef = secretRef
+    }
+
+    public var isSecret: Bool { kind == .secret }
+
+    /// What a row shows first: the name if there is one, otherwise the content's title.
+    public var displayTitle: String { name ?? title }
+
+    /// Trims a typed name; a blank name means no name.
+    public static func normalizedName(_ raw: String?) -> String? {
+        let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// One-line label: first non-empty line of text, file names, or "Image".
@@ -66,6 +85,8 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
                 .joined(separator: ", ")
         case .image:
             return "Image"
+        case .secret:
+            return "Secret"
         }
     }
 }

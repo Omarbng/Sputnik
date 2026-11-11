@@ -2,16 +2,16 @@ import AppKit
 
 /// The dock's buttons, left to right (section 5.4). The toggle stays pinned at the right end.
 enum DockItem: Int, CaseIterable, Identifiable {
-    case history, pinned, translate, pasteAll, settings, toggle
+    case history, saved, translate, pasteAll, settings, toggle
 
-    static let main: [DockItem] = [.history, .pinned, .translate, .pasteAll, .settings]
+    static let main: [DockItem] = [.history, .saved, .translate, .pasteAll, .settings]
 
     var id: Int { rawValue }
 
     func symbol(collapsed: Bool) -> String {
         switch self {
         case .history: "clock.arrow.circlepath"
-        case .pinned: "pin"
+        case .saved: "star"
         case .translate: "character.bubble"
         case .pasteAll: "square.stack"
         case .settings: "gearshape"
@@ -22,7 +22,7 @@ enum DockItem: Int, CaseIterable, Identifiable {
     func title(collapsed: Bool) -> String {
         switch self {
         case .history: "History"
-        case .pinned: "Pinned"
+        case .saved: "Saved"
         case .translate: "Translate"
         case .pasteAll: "Paste all"
         case .settings: "Settings"
@@ -33,6 +33,7 @@ enum DockItem: Int, CaseIterable, Identifiable {
     /// Shortcut keycaps shown in the tooltip, for example "Translate ⌘ T".
     var keys: [String] {
         switch self {
+        case .history, .saved: ["⇥"]
         case .translate: ["⌘", "T"]
         case .pasteAll: ["⌘", "↩"]
         case .settings: ["⌘", ","]

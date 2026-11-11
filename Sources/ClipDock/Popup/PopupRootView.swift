@@ -9,6 +9,7 @@ struct PopupRootView: View {
     let icons: AppIconCache
     let thumbnails: ThumbnailCache
     let searchField: NSTextField
+    let editorFields: EditorFields
     let onDock: (DockItem) -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -30,19 +31,59 @@ struct PopupRootView: View {
     }
 
     private func card(_ tokens: Tokens) -> some View {
+        ZStack(alignment: .topTrailing) {
+            // The list stays in place under the editor, so the search field keeps its view.
+            listCard(tokens)
+                .opacity(model.editor == nil ? 1 : 0)
+                .allowsHitTesting(model.editor == nil)
+            if let editor = model.editor {
+                EditorView(state: editor, fields: editorFields, tokens: tokens) { command in
+                    model.onEditorCommand?(command)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if let menu = model.actionMenu, let item = model.actionMenuItem {
+                // A click anywhere else in the card closes the menu.
+                Color.black.opacity(0.001)
+                    .onTapGesture { model.actionMenu = nil }
+                ActionMenuView(
+                    menu: menu, item: item, tokens: tokens,
+                    onRun: { action in model.onRunAction?(action, item) },
+                    onHover: { index in model.actionMenu?.highlighted = index }
+                )
+                .padding(.top, PopupLayout.searchHeight + 4)
+                .padding(.trailing, 8)
+                .transition(.opacity)
+            }
+        }
+        .animation(Motion.fade(Motion.reduceMotion), value: model.actionMenu?.itemID)
+        .frame(width: PopupLayout.cardWidth, height: PopupLayout.cardHeight)
+        .clipShape(RoundedRectangle(cornerRadius: PopupLayout.cardCornerRadius, style: .continuous))
+        .background(MaterialBackground(cornerRadius: PopupLayout.cardCornerRadius))
+    }
+
+    private func listCard(_ tokens: Tokens) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tokens.mutedForeground)
-                SearchFieldView(field: searchField)
-                if model.scope == .pinned {
-                    Text("Pinned")
+                HostedView(view: searchField)
+                if model.scope == .saved {
+                    Button { model.onNewSaved?() } label: {
+                        HStack(spacing: 5) {
+                            Text("Saved")
+                            Keycaps(keys: ["⌘", "N"], color: tokens.mutedForeground)
+                        }
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(tokens.mutedForeground)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
+                        .padding(.leading, 8)
+                        .padding(.trailing, 3)
+                        .frame(height: 24)
                         .background(tokens.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("New saved item (⌘N)")
                 }
             }
             .padding(.horizontal, 14)
@@ -52,21 +93,11 @@ struct PopupRootView: View {
 
             PopupListView(model: model, icons: icons, thumbnails: thumbnails)
         }
-        .frame(width: PopupLayout.cardWidth, height: PopupLayout.cardHeight)
-        .clipShape(RoundedRectangle(cornerRadius: PopupLayout.cardCornerRadius, style: .continuous))
-        .background(MaterialBackground(cornerRadius: PopupLayout.cardCornerRadius))
     }
 }
 
-/// The search box is an AppKit text field, so the controller can focus it reliably on every
-/// open. SwiftUI only places it.
-private struct SearchFieldView: NSViewRepresentable {
-    let field: NSTextField
-
-    func makeNSView(context: Context) -> NSTextField { field }
-    func updateNSView(_ nsView: NSTextField, context: Context) {}
-}
-
+/// The search box is an AppKit text field (placed with `HostedView`), so the controller can
+/// focus it reliably on every open.
 extension NSTextField {
     /// Borderless, transparent search field for the popup card.
     static func popupSearchField() -> NSTextField {
@@ -78,10 +109,7 @@ extension NSTextField {
         field.textColor = .labelColor
         field.usesSingleLineMode = true
         field.lineBreakMode = .byTruncatingTail
-        field.placeholderAttributedString = NSAttributedString(
-            string: "Search",
-            attributes: [.foregroundColor: NSColor.secondaryLabelColor, .font: NSFont.systemFont(ofSize: 14)]
-        )
+        field.placeholderAttributedString = .placeholder("Search", size: 14)
         return field
     }
 }

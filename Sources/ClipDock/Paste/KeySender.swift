@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 import CoreGraphics
 
@@ -9,6 +10,15 @@ enum KeySender {
     static func commandC() { command(CGKeyCode(kVK_ANSI_C)) }
 
     private static func command(_ key: CGKeyCode) {
+        #if CLIPDOCK_TEST_BUILD
+        // Test builds launched for scripts send keys only into the test target, checked right
+        // before sending, so a test can't paste into an app Omar is using at that moment.
+        if ProcessInfo.processInfo.environment["CLIPDOCK_TEST_TARGET_ONLY"] == "1",
+           NSWorkspace.shared.frontmostApplication?.bundleIdentifier != "com.omar.clipdock.testtarget" {
+            Log.paste.notice("test build: key not sent, the test target isn't frontmost")
+            return
+        }
+        #endif
         let source = CGEventSource(stateID: .combinedSessionState)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)

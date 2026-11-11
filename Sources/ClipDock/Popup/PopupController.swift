@@ -4,14 +4,18 @@ import SwiftUI
 
 /// Owns the popup. The panel is created once at launch and then only shown and hidden, so
 /// opening is instant. It closes on Esc, a click outside, picking an item, or losing focus.
+/// Keys go to one of three modes: the list, the actions menu, or the editor.
 @MainActor
 final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let model: PopupViewModel
-    private let panel = PopupPanel()
-    private let searchField = NSTextField.popupSearchField()
-    private let actions: ItemActions
-    private let translation: TranslationService
+    let panel = PopupPanel()
+    let searchField = NSTextField.popupSearchField()
+    let editorFields = EditorFields()
+    let actions: ItemActions
+    let saved: SavedItems
+    let translation: TranslationService
     private var keyMonitor: Any?
+    private var rightClickMonitor: Any?
     private var clickMonitor: Any?
 
     /// ⌘, in the popup.
@@ -30,21 +34,29 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
     init(
         history: HistoryModel, icons: AppIconCache, thumbnails: ThumbnailCache,
-        actions: ItemActions, translation: TranslationService
+        actions: ItemActions, saved: SavedItems, translation: TranslationService
     ) {
         let model = PopupViewModel(history: history)
         self.model = model
         self.actions = actions
+        self.saved = saved
         self.translation = translation
         super.init()
 
         let root = PopupRootView(
             model: model, icons: icons, thumbnails: thumbnails, searchField: searchField,
+            editorFields: editorFields,
             onDock: { [weak self] item in self?.handleDock(item) }
         )
         let hosting = NSHostingView(rootView: root)
         hosting.sizingOptions = []  // fixed-size panel: SwiftUI must not resize the window
         model.onPick = { [weak self] item in self?.paste(item) }
+        model.onShowActions = { [weak self] item in self?.showActions(for: item) }
+        model.onRequestDelete = { [weak self] item in self?.requestDelete(item) }
+        model.onRunAction = { [weak self] action, item in self?.run(action, on: item) }
+        model.onEditorCommand = { [weak self] command in self?.handleEditor(command) }
+        model.onNewSaved = { [weak self] in self?.openEditor(for: nil) }
+        editorFields.onSubmitSecret = { [weak self] in self?.handleEditor(.save) }
         panel.contentView = hosting
         panel.setContentSize(PopupLayout.windowSize)
         panel.acceptsMouseMovedEvents = true  // dock hover and tooltips
@@ -95,60 +107,12 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
     func close(_ reason: CloseReason = .other) {
         removeMonitors()
+        editorFields.clear()  // a half-typed secret must not linger
+        model.editor = nil
+        model.actionMenu = nil
         guard panel.isVisible else { return }
         panel.orderOut(nil)
         Log.popup.notice("closed reason=\(reason.rawValue, privacy: .public)")
-    }
-
-    func perform(_ command: PopupCommand) {
-        switch command {
-        case .close:
-            close(.escape)
-        case .moveUp:
-            model.moveSelection(by: -1)
-        case .moveDown:
-            model.moveSelection(by: 1)
-        case .pasteSelected:
-            if let text = model.selectedTranslation {
-                actions.pasteTranslation(text, closePopup: { close(.picked) })
-            } else if let item = model.selectedItem {
-                paste(item)
-            }
-        case .pasteNumber(let number):
-            if let item = model.item(at: number - 1) { paste(item) }
-        case .copySelected:
-            if let text = model.selectedTranslation {
-                actions.copyTranslation(text, closePopup: { close(.picked) })
-            } else if let item = model.selectedItem {
-                actions.copy(item, closePopup: { close(.picked) })
-            }
-        case .translateSelected:
-            translateSelected()
-        case .toggleMark:
-            if let id = model.selectedItem?.id { model.marks.toggle(id) }
-        case .pasteMarked:
-            if model.marks.isEmpty {
-                perform(.pasteSelected)
-            } else {
-                actions.pasteAll(model.markedItems, closePopup: { close(.picked) })
-            }
-        case .togglePin:
-            if let item = model.selectedItem { actions.togglePin(item) }
-        case .openSettings:
-            close(.other)
-            onOpenSettings?()
-        case .deleteSelected:
-            if let item = model.selectedItem {
-                actions.delete(item)
-                model.clampSelection()
-            }
-        case .selectAllText:
-            searchField.currentEditor()?.selectAll(nil)
-        case .cutText:
-            searchField.currentEditor()?.cut(nil)
-        case .pasteText:
-            searchField.currentEditor()?.paste(nil)
-        }
     }
 
     /// Sets the search text as if typed (used by debug hooks).
@@ -161,13 +125,13 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     func handleDock(_ item: DockItem) {
         switch item {
         case .history: model.scope = .history
-        case .pinned: model.scope = model.scope == .pinned ? .history : .pinned
+        case .saved: model.scope = model.scope == .saved ? .history : .saved
         case .translate: perform(.translateSelected)
         case .pasteAll: perform(.pasteMarked)
         case .settings: perform(.openSettings)
         case .toggle: model.isCollapsed.toggle()
         }
-        if panel.isVisible { panel.makeFirstResponder(searchField) }  // keep typing working after a click
+        if panel.isVisible, model.editor == nil { panel.makeFirstResponder(searchField) }  // keep typing working
     }
 
     // MARK: NSWindowDelegate / NSTextFieldDelegate
@@ -177,40 +141,24 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     func controlTextDidChange(_ obj: Notification) {
+        guard (obj.object as? NSTextField) === searchField else { return }
         model.isCollapsed = false
+        model.actionMenu = nil
         model.query = searchField.stringValue
     }
 
-    // MARK: Private
-
-    /// ⌘T: translate the selected row and show the result under it.
-    private func translateSelected() {
-        guard let item = model.selectedItem, let id = item.id else { return }
-        guard model.translation?.itemID != id else { return }  // already shown or in progress
-        guard item.kind == .text || item.kind == .url, let text = item.text else {
-            model.translation = RowTranslation(itemID: id, state: .failed("Only text can be translated"))
-            return
-        }
-        model.translation = RowTranslation(itemID: id, state: .working)
-        Task {
-            let state: RowTranslation.State
-            do {
-                state = .done(try await translation.translate(text))
-            } catch {
-                state = .failed(translation.describe(error))
-            }
-            if model.translation?.itemID == id { model.translation?.state = state }
-        }
-    }
-
-    private func paste(_ item: ClipItem) {
-        actions.paste(item, closePopup: { close(.picked) })
-    }
+    // MARK: Keys and clicks
 
     private func installMonitors() {
         if keyMonitor == nil {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 let handled = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
+                return handled ? nil : event
+            }
+        }
+        if rightClickMonitor == nil {
+            rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+                let handled = MainActor.assumeIsolated { self?.handleRightClick(event) ?? false }
                 return handled ? nil : event
             }
         }
@@ -223,25 +171,45 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     private func removeMonitors() {
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
-        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        for monitor in [keyMonitor, rightClickMonitor, clickMonitor].compactMap({ $0 }) {
+            NSEvent.removeMonitor(monitor)
+        }
         keyMonitor = nil
+        rightClickMonitor = nil
         clickMonitor = nil
     }
 
     private func handleKey(_ event: NSEvent) -> Bool {
-        guard event.window === panel,
-              let command = PopupKeymap.command(keyCode: event.keyCode, modifiers: .init(event.modifierFlags))
-        else { return false }
+        guard event.window === panel else { return false }
+        let modifiers = PopupKeymap.Modifiers(event.modifierFlags)
+        if model.editor != nil {
+            guard let command = EditorKeymap.command(keyCode: event.keyCode, modifiers: modifiers) else { return false }
+            handleEditor(command)
+            return true
+        }
+        guard let command = PopupKeymap.command(keyCode: event.keyCode, modifiers: modifiers) else {
+            return model.actionMenu != nil  // typing doesn't reach the search while the menu is open
+        }
         return handle(command)
+    }
+
+    /// A right-click on a row opens its actions menu.
+    private func handleRightClick(_ event: NSEvent) -> Bool {
+        guard event.window === panel, model.editor == nil,
+              let id = model.hoveredItemID, let item = model.item(id: id)
+        else { return false }
+        showActions(for: item)
+        return true
     }
 
     /// Runs a key's command. Returns false when the key should go to the search field instead.
     func handle(_ command: PopupCommand) -> Bool {
+        if model.actionMenu != nil { return handleInMenu(command) }
         // Space marks items only while the search box is empty; otherwise it types a space,
         // so multi-word searches work (Omar's choice, 2026-11-10).
         if command == .toggleMark, !model.query.isEmpty { return false }
         if command != .close { model.isCollapsed = false }  // any action brings the list back
+        if command != .deleteSelected { model.pendingDeleteID = nil }
         perform(command)
         return true
     }

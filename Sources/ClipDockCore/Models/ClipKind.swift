@@ -6,4 +6,6 @@ public enum ClipKind: String, Codable, Sendable, CaseIterable, DatabaseValueConv
     case url
     case image
     case file
+    /// A saved secret. The row holds only its name; the value lives in the macOS Keychain.
+    case secret
 }

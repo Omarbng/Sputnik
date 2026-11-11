@@ -10,7 +10,7 @@ public struct HistoryChange: Sendable, Equatable {
 
 /// SQLite history (GRDB) plus the blob folder. Thread-safe; call it off the main thread.
 public final class HistoryDatabase: Sendable {
-    private let queue: DatabaseQueue
+    let queue: DatabaseQueue
     public let blobs: BlobStore
 
     /// Opens or creates `<directory>/history.sqlite` and `<directory>/blobs/`.
@@ -148,12 +148,16 @@ public final class HistoryDatabase: Sendable {
         let doomed = try ClipItem.fetchAll(db, keys: ids)
         let blobNames = Set(doomed.flatMap { [$0.imageBlob, $0.rtfBlob].compactMap { $0 } })
         _ = try ClipItem.deleteAll(db, keys: ids)
-        let orphans = try blobNames.filter { name in
+        return (doomed.compactMap(\.id), try unreferenced(blobNames, in: db))
+    }
+
+    /// The blob names no row points at any more.
+    static func unreferenced(_ names: Set<String>, in db: Database) throws -> [String] {
+        try names.filter { name in
             try ClipItem
                 .filter(ClipItem.Columns.imageBlob == name || ClipItem.Columns.rtfBlob == name)
                 .fetchCount(db) == 0
         }
-        return (doomed.compactMap(\.id), Array(orphans))
     }
 
     private static var migrator: DatabaseMigrator {
@@ -177,6 +181,12 @@ public final class HistoryDatabase: Sendable {
         migrator.registerMigration("v2-translation-badge") { db in
             try db.alter(table: ClipItem.databaseTableName) { t in
                 t.add(column: "isTranslation", .boolean).notNull().defaults(to: false)
+            }
+        }
+        migrator.registerMigration("v3-saved-items") { db in
+            try db.alter(table: ClipItem.databaseTableName) { t in
+                t.add(column: "name", .text)
+                t.add(column: "secretRef", .text)
             }
         }
         return migrator

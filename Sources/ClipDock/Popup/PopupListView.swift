@@ -1,8 +1,9 @@
 import ClipDockCore
 import SwiftUI
 
-/// The history list: Pinned on top (when there are any), then Recent. The selected row is a
-/// soft filled capsule that slides between rows with the tooltip-slide spring.
+/// The list: in History, recent copies (plus matching saved items while searching); in Saved,
+/// the saved items. The selected row is a soft filled capsule that slides between rows with the
+/// tooltip-slide spring.
 struct PopupListView: View {
     let model: PopupViewModel
     let icons: AppIconCache
@@ -19,6 +20,7 @@ struct PopupListView: View {
 
         if all.isEmpty {
             Text(emptyMessage)
+                .multilineTextAlignment(.center)
                 .font(.system(size: 13))
                 .foregroundStyle(tokens.mutedForeground)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -26,11 +28,11 @@ struct PopupListView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        if !sections.pinned.isEmpty, model.scope == .history {
-                            header("Pinned", tokens)
+                        if !sections.saved.isEmpty, model.scope == .history {
+                            header("Saved", tokens)
                         }
-                        rows(sections.pinned, selectedID: selectedID, tokens: tokens)
-                        if !sections.pinned.isEmpty, !sections.recent.isEmpty {
+                        rows(sections.saved, selectedID: selectedID, tokens: tokens)
+                        if !sections.saved.isEmpty, !sections.recent.isEmpty {
                             header("Recent", tokens)
                         }
                         rows(sections.recent, selectedID: selectedID, tokens: tokens)
@@ -51,7 +53,9 @@ struct PopupListView: View {
 
     private var emptyMessage: String {
         if !model.query.isEmpty { return "No matches" }
-        return model.scope == .pinned ? "No pinned items — ⌘P pins one" : "Nothing copied yet"
+        return model.scope == .saved
+            ? "Nothing saved yet\n⌘N types one in · ⌘P saves a copied one"
+            : "Nothing copied yet"
     }
 
     private func header(_ title: String, _ tokens: Tokens) -> some View {
@@ -71,8 +75,19 @@ struct PopupListView: View {
                     markNumber: item.id.flatMap { model.marks.number(for: $0) },
                     appIcon: icons.icon(for: item.sourceBundleID),
                     thumbnails: thumbnails,
-                    tokens: tokens
+                    tokens: tokens,
+                    isHovered: item.id != nil && model.hoveredItemID == item.id && model.actionMenu == nil,
+                    isPendingDelete: item.id != nil && model.pendingDeleteID == item.id,
+                    onActions: { model.onShowActions?(item) },
+                    onDelete: { model.onRequestDelete?(item) }
                 )
+                .onHover { inside in
+                    if inside {
+                        model.hoveredItemID = item.id
+                    } else if model.hoveredItemID == item.id {
+                        model.hoveredItemID = nil
+                    }
+                }
                 .background {
                     if item.id == selectedID {
                         Capsule(style: .continuous)
