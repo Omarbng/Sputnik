@@ -1,10 +1,11 @@
 import AppKit
 
 /// The dock's buttons, left to right (section 5.4). The toggle stays pinned at the right end.
+/// Secrets replaced Paste all on 2026-11-11 (Omar); Paste all is still Space, then ⌘↩.
 enum DockItem: Int, CaseIterable, Identifiable {
-    case history, saved, translate, pasteAll, settings, toggle
+    case history, saved, secrets, translate, settings, toggle
 
-    static let main: [DockItem] = [.history, .saved, .translate, .pasteAll, .settings]
+    static let main: [DockItem] = [.history, .saved, .secrets, .translate, .settings]
 
     var id: Int { rawValue }
 
@@ -13,7 +14,7 @@ enum DockItem: Int, CaseIterable, Identifiable {
         case .history: "clock.arrow.circlepath"
         case .saved: "star"
         case .translate: "character.bubble"
-        case .pasteAll: "square.stack"
+        case .secrets: "key"
         case .settings: "gearshape"
         case .toggle: collapsed ? "chevron.left" : "chevron.right"
         }
@@ -24,7 +25,7 @@ enum DockItem: Int, CaseIterable, Identifiable {
         case .history: "History"
         case .saved: "Saved"
         case .translate: "Translate"
-        case .pasteAll: "Paste all"
+        case .secrets: "Secrets"
         case .settings: "Settings"
         case .toggle: collapsed ? "Expand" : "Collapse"
         }
@@ -33,9 +34,8 @@ enum DockItem: Int, CaseIterable, Identifiable {
     /// Shortcut keycaps shown in the tooltip, for example "Translate ⌘ T".
     var keys: [String] {
         switch self {
-        case .history, .saved: ["⇥"]
+        case .history, .saved, .secrets: ["⇥"]
         case .translate: ["⌘", "T"]
-        case .pasteAll: ["⌘", "↩"]
         case .settings: ["⌘", ","]
         default: []
         }

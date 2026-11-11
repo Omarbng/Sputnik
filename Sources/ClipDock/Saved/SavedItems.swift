@@ -22,16 +22,8 @@ final class SavedItems {
     func create(name: String?, value: String, secret: Bool) async throws -> ClipItem {
         let item: ClipItem
         if secret {
-            guard let name else { throw Problem(message: "Give the secret a name, so you can find it.") }
             guard !value.isEmpty else { throw Problem(message: "Type or paste the secret first.") }
-            let account = UUID().uuidString
-            try await keychain { try SecretStore.add(value, account: account) }
-            do {
-                item = try database.saveSecret(name: name, secretRef: account, now: .now)
-            } catch {
-                try? await keychain { try SecretStore.delete(account: account) }
-                throw Problem(message: "Couldn't save it.")
-            }
+            return try await saveSecret(value, name: name)
         } else {
             guard !value.allSatisfy(\.isWhitespace) else { throw Problem(message: "Type something to save.") }
             item = try database.saveText(value, name: name, now: .now)
@@ -41,11 +33,38 @@ final class SavedItems {
         return item
     }
 
+    /// Keeps `text` as a secret: ⌘L on a copied item, ⌘V in the Secrets tab, or ⌘N there.
+    /// Without a name it's named from the value ("OpenAI key", `OPENAI_API_KEY`, "Secret 2").
+    /// Plain copies of the text leave history in the same step, so the key isn't kept twice.
+    func saveSecret(_ text: String, name: String?) async throws -> ClipItem {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { throw Problem(message: "There's nothing to save.") }
+        let taken = Set(history.items.filter(\.isSecret).compactMap(\.name))
+        let name = name ?? SecretNamer.name(for: value, existing: taken)
+        let copies = Set([text, value].map {
+            CapturedClip(payload: .fromText($0, rtf: nil), sourceBundleID: nil, sourceAppName: nil, capturedAt: .now).contentHash
+        })
+        let account = UUID().uuidString
+        try await keychain { try SecretStore.add(value, account: account) }
+        do {
+            let (item, removed) = try database.saveSecret(
+                name: name, secretRef: account, now: .now, removingPlainCopies: Array(copies)
+            )
+            history.remove(ids: removed)
+            history.moveToTop(item)
+            Log.storage.notice("saved secret id=\(item.id ?? -1, privacy: .public) removedCopies=\(removed.count, privacy: .public)")
+            return item
+        } catch {
+            try? await keychain { try SecretStore.delete(account: account) }
+            throw Problem(message: "Couldn't save it.")
+        }
+    }
+
     /// ⌘E → Save. For a secret, `value` is a new value, or empty to keep the old one.
     func update(_ item: ClipItem, name: String?, value: String) async throws -> ClipItem {
         guard let id = item.id else { throw Problem(message: "That item is gone.") }
         if item.isSecret {
-            guard let name else { throw Problem(message: "A secret needs a name.") }
+            let name = name ?? item.name ?? "Secret"
             if !value.isEmpty, let account = item.secretRef {
                 try await keychain { try SecretStore.update(value, account: account) }
             }

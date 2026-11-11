@@ -5,7 +5,7 @@ import SwiftUI
 /// ↑↓ move, ↩ runs, Esc closes. The shortcuts also work directly, without opening it.
 struct ActionMenuView: View {
     static let width: CGFloat = 244
-    static let rowHeight: CGFloat = 24  // ten actions still fit inside the card
+    static let rowHeight: CGFloat = 22  // eleven actions still fit inside the card, like a native menu
 
     let menu: ActionMenuState
     let item: ClipItem

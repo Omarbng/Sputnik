@@ -58,6 +58,12 @@ struct HistoryFilterTests {
         #expect(HistoryFilter.sections(of: [named, secret], query: "openai").all.compactMap(\.id) == [7])
         #expect(HistoryFilter.sections(of: [named, secret], query: "bank").all.compactMap(\.id) == [8])
         #expect(HistoryFilter.searchKey(for: secret) == "bank pin\nsecret\n")
+        // The Saved tab has the named text; the Secrets tab has the secret.
+        #expect(HistoryFilter.sections(of: [named, secret], query: "", scope: .saved).all.compactMap(\.id) == [7])
+        #expect(HistoryFilter.sections(of: [named, secret], query: "", scope: .secrets).all.compactMap(\.id) == [8])
+        #expect(HistoryScope.history.next == .saved)
+        #expect(HistoryScope.secrets.next == .history)
+        #expect(HistoryScope.history.previous == .secrets)
         #expect(named.displayTitle == "OpenAI key")
         #expect(secret.displayTitle == "Bank PIN")
     }

@@ -53,9 +53,11 @@ struct PopupListView: View {
 
     private var emptyMessage: String {
         if !model.query.isEmpty { return "No matches" }
-        return model.scope == .saved
-            ? "Nothing saved yet\n⌘N types one in · ⌘P saves a copied one"
-            : "Nothing copied yet"
+        return switch model.scope {
+        case .history: "Nothing copied yet"
+        case .saved: "Nothing saved yet\n⌘N types one in · ⌘P saves a copied one"
+        case .secrets: "No secrets yet\nCopy a key, then press ⌘V here\nor press ⌘L on it in History"
+        }
     }
 
     private func header(_ title: String, _ tokens: Tokens) -> some View {

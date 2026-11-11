@@ -1,9 +1,15 @@
-/// The popup's two tabs (the dock's first two buttons).
-public enum HistoryScope: Sendable, Equatable {
-    /// What you copied. Saved items join in only while you search.
+/// The popup's tabs (the dock's first three buttons). ⇥ moves through them in this order.
+public enum HistoryScope: Sendable, Equatable, CaseIterable {
+    /// What you copied. Saved items and secrets join in only while you search.
     case history
-    /// Pinned clips, typed-in items, and secrets.
+    /// Pinned clips and typed-in items.
     case saved
+    /// Passwords and keys, kept in the Keychain.
+    case secrets
+
+    public var next: HistoryScope { Self.allCases[(index + 1) % Self.allCases.count] }
+    public var previous: HistoryScope { Self.allCases[(index + Self.allCases.count - 1) % Self.allCases.count] }
+    private var index: Int { Self.allCases.firstIndex(of: self)! }
 }
 
 /// Search in the popup: case-insensitive, over the item's name, its text, and its source app's
@@ -40,17 +46,20 @@ public enum HistoryFilter {
 
     /// `keys` maps item IDs to precomputed search keys. Missing keys are computed on the fly.
     /// History without a search shows only unsaved items, so ↩ and ⌘1 always reach what you
-    /// copied last; saved items live in their own tab and join any search.
+    /// copied last; saved items and secrets live in their own tabs and join any History search.
     public static func sections(
         of items: [ClipItem], query: String, keys: [Int64: String] = [:], scope: HistoryScope = .history
     ) -> Sections {
         let terms = terms(in: query)
-        let showsSaved = scope == .saved || !terms.isEmpty
-        let showsRecent = scope == .history
         var saved: [ClipItem] = []
         var recent: [ClipItem] = []
         for item in items {
-            guard item.isPinned ? showsSaved : showsRecent else { continue }
+            let shown = switch scope {
+            case .history: !item.isPinned || !terms.isEmpty
+            case .saved: item.isPinned && !item.isSecret
+            case .secrets: item.isSecret
+            }
+            guard shown else { continue }
             if !terms.isEmpty {
                 let key = item.id.flatMap { keys[$0] } ?? searchKey(for: item)
                 guard terms.allSatisfy({ key.contains($0) }) else { continue }

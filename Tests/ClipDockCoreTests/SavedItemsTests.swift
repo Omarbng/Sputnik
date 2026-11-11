@@ -97,6 +97,24 @@ struct SavedItemsTests {
         #expect(ClipItem.normalizedName(nil) == nil)
     }
 
+    @Test("Saving a copied key as a secret removes its plain copies from history, and their blobs")
+    func saveSecretRemovesCopies() throws {
+        let rich = CapturedClip(
+            payload: .text("sk-proj-abc\n", rtf: Data("{\\rtf1 x}".utf8)),
+            sourceBundleID: nil, sourceAppName: nil, capturedAt: daysAgo(1)
+        )
+        let copy = try db.ingest(rich, retention: policy).item
+        let trimmedCopy = try db.ingest(textClip("sk-proj-abc"), retention: policy).item
+        let other = try db.ingest(textClip("keep me"), retention: policy).item
+        let (secret, removed) = try db.saveSecret(
+            name: "OpenAI key", secretRef: "ref-5", now: referenceNow,
+            removingPlainCopies: [copy.contentHash, trimmedCopy.contentHash]
+        )
+        #expect(Set(removed) == [copy.id!, trimmedCopy.id!])
+        #expect(Set(try db.allItems().map(\.id)) == [secret.id, other.id])
+        #expect(try history.blobFiles().isEmpty)
+    }
+
     @Test("Paste all leaves secrets out")
     func pasteAllSkipsSecrets() throws {
         let text = try db.ingest(textClip("visible"), retention: policy).item
@@ -119,7 +137,7 @@ struct ClipActionTests {
     @Test("Text gets every action; Paste as Plain Text only when it has formatting")
     func text() {
         #expect(ClipAction.available(for: item(.text)) == [
-            .paste, .copy, .edit, .translate, .togglePin, .uppercase, .lowercase, .tidy, .delete,
+            .paste, .copy, .edit, .translate, .togglePin, .saveAsSecret, .uppercase, .lowercase, .tidy, .delete,
         ])
         #expect(ClipAction.available(for: item(.text, rtf: "a.rtf")).prefix(2) == [.paste, .pastePlain])
     }
@@ -130,6 +148,8 @@ struct ClipActionTests {
         #expect(!ClipAction.available(for: item(.url)).contains(.translate))
         let file = item(.file)
         #expect(ClipAction.available(for: file).contains(.pastePlain))
+        #expect(!ClipAction.available(for: file).contains(.saveAsSecret))
+        #expect(ClipAction.available(for: item(.url)).contains(.saveAsSecret))
         #expect(ClipAction.open.title(for: file) == "Show in Finder")
         #expect(ClipAction.pastePlain.title(for: file) == "Paste as Path")
     }
@@ -143,6 +163,37 @@ struct ClipActionTests {
     func pinTitle() {
         #expect(ClipAction.togglePin.title(for: item(.text)) == "Add to Saved")
         #expect(ClipAction.togglePin.title(for: item(.text, pinned: true)) == "Remove from Saved")
+    }
+}
+
+@Suite("Secret names")
+struct SecretNamerTests {
+    @Test("Known key prefixes name the kind of key")
+    func prefixes() {
+        #expect(SecretNamer.name(for: "sk-proj-AbC123", existing: []) == "OpenAI key")
+        #expect(SecretNamer.name(for: "sk-ant-api03-xyz", existing: []) == "Anthropic key")
+        #expect(SecretNamer.name(for: "  ghp_abcdef \n", existing: []) == "GitHub token")
+        #expect(SecretNamer.name(for: "AKIAIOSFODNN7EXAMPLE", existing: []) == "AWS key")
+        #expect(SecretNamer.name(for: "hunter2", existing: []) == "Secret")
+    }
+
+    @Test("An environment line is named after its variable")
+    func variables() {
+        #expect(SecretNamer.name(for: "OPENAI_API_KEY=sk-proj-1", existing: []) == "OPENAI_API_KEY")
+        #expect(SecretNamer.name(for: "export STRIPE_KEY = sk_live_1", existing: []) == "STRIPE_KEY")
+        #expect(SecretNamer.name(for: "A=1\nB=2", existing: []) == "Secret")
+        #expect(SecretNamer.name(for: "EMPTY=", existing: []) == "Secret")
+    }
+
+    @Test("Prose that starts like a key isn't named as one")
+    func prose() {
+        #expect(SecretNamer.name(for: "ASIA trip plans", existing: []) == "Secret")
+    }
+
+    @Test("A name in use gets the next number")
+    func numbering() {
+        #expect(SecretNamer.name(for: "sk-1", existing: ["OpenAI key"]) == "OpenAI key 2")
+        #expect(SecretNamer.name(for: "x", existing: ["Secret", "Secret 2"]) == "Secret 3")
     }
 }
 

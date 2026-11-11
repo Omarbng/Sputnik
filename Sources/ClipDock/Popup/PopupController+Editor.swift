@@ -4,8 +4,8 @@ import ClipDockCore
 /// The editor, in place of the list: ⌘N types in a new saved item, ⌘E edits the selected one.
 /// Nothing opens: it's part of the popup, and Esc goes back to the list.
 extension PopupController {
-    /// `item` nil starts a new saved item.
-    func openEditor(for item: ClipItem?) {
+    /// `item` nil starts a new saved item (a secret, from the Secrets tab).
+    func openEditor(for item: ClipItem?, secret: Bool = false) {
         model.actionMenu = nil
         model.isCollapsed = false
         if let item {
@@ -13,13 +13,14 @@ extension PopupController {
                 actions.notify("Only text can be edited")
                 return
             }
-            editorFields.load(name: item.name, text: item.text ?? "", namePlaceholder: item.isSecret ? "Name" : "Name (optional)")
+            editorFields.load(name: item.name, text: item.text ?? "", namePlaceholder: "Name (optional)")
             model.editor = EditorState(mode: .edit(id), showsName: item.isPinned, isSecret: item.isSecret)
             focusEditor(on: item.isSecret ? editorFields.secretField : editorFields.textView)
         } else {
             editorFields.load(name: nil, text: "", namePlaceholder: "Name (optional)")
-            model.editor = EditorState(mode: .new, showsName: true, isSecret: false)
-            focusEditor(on: editorFields.nameField)
+            model.editor = EditorState(mode: .new, showsName: true, isSecret: secret)
+            // A secret starts at its value: the name is optional and filled in automatically.
+            focusEditor(on: secret ? editorFields.secretField : editorFields.nameField)
         }
     }
 
@@ -37,10 +38,8 @@ extension PopupController {
             model.editor?.isSecret.toggle()
             model.editor?.message = nil
             if model.editor?.isSecret == true {
-                editorFields.nameField.placeholderAttributedString = .placeholder("Name, such as “OpenAI key”")
                 focusEditor(on: editorFields.secretField)
             } else {
-                editorFields.nameField.placeholderAttributedString = .placeholder("Name (optional)")
                 focusEditor(on: editorFields.textView)
             }
         case .selectAll:
@@ -83,7 +82,7 @@ extension PopupController {
                 closeEditor()
                 if state.mode == .new {
                     setQuery("")
-                    model.scope = .saved
+                    model.scope = item.isSecret ? .secrets : .saved
                 }
                 model.select(item)
             } catch let problem as SavedItems.Problem {

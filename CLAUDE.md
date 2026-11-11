@@ -59,7 +59,7 @@ combos (such as ⌘⇧V) can still be recorded there.
 |---|---|
 | typing | Filter the list |
 | ↑ ↓ | Move the selection |
-| ⇥ | Switch between History and Saved (added 2026-11-11) |
+| ⇥ / ⇧⇥ | Next / previous tab: History → Saved → Secrets (added 2026-11-11) |
 | ↩ | Paste the selected item |
 | ⌥↩ | Paste as plain text, or a file's path (added 2026-11-11) |
 | ⌘1 – ⌘9 | Paste the Nth visible item |
@@ -70,7 +70,9 @@ combos (such as ⌘⇧V) can still be recorded there.
 | ⌘T | Translate the selected item and show the result under it. ↩ pastes the translation. |
 | ⌘E | Edit the item: ⌘↩ pastes the edited text, ⌘S saves it, Esc cancels (added 2026-11-11) |
 | ⌘O | Open a link, or show a file in Finder (added 2026-11-11) |
-| ⌘N | Type in a new saved item; ⌘L in the editor makes it a secret (added 2026-11-11) |
+| ⌘L | Save the selected item as a secret: it moves to the Keychain and leaves history (added 2026-11-11) |
+| ⌘V in the Secrets tab | Save what you copied as a secret (with an empty search) (added 2026-11-11) |
+| ⌘N | Type in a new saved item (in the Secrets tab, a new secret; the name is optional) (added 2026-11-11) |
 | ⌘C | Copy without pasting |
 | ⌘⌫ | Delete the item. A saved item asks first: press ⌘⌫ again. |
 | ⌘, | Open Settings |
@@ -186,9 +188,14 @@ Keep it small, with these settings:
 - **permission status:** Accessibility and Paste from Other Apps, each with an "Open Settings" button
 
 ### 4.8 Saved items and secrets (added 2026-11-11, Omar)
-- The Pinned tab is now **Saved**. It holds pinned clips (⌘P), text Omar types in with ⌘N
-  (an optional name, such as "Office address"), and secrets.
-- **Secrets** (⌘N, then ⌘L): for passwords and API keys.
+- The Pinned tab is now **Saved**. It holds pinned clips (⌘P) and text Omar types in with ⌘N
+  (an optional name, such as "Office address").
+- **Secrets** have their own tab (🔑 in the dock, always there). **Changed 2026-11-11 (Omar):
+  saving one is a single step, with no name to type:** ⌘L on a copied item, or copy the key and
+  press ⌘V in the Secrets tab. ⌘N there types one in. Plain copies of the value leave history.
+  - Unnamed secrets are named automatically: `OPENAI_API_KEY` for an `OPENAI_API_KEY=…` line,
+    the kind of key for known prefixes ("OpenAI key", "GitHub token"), otherwise "Secret",
+    numbered when taken ("OpenAI key 2"). Nothing of the value goes into the name. ⌘E renames.
   - The value goes in the login **Keychain** only. The database row holds just the name and a
     Keychain reference, and the row shows dots instead of the value.
   - Pasting or copying one asks for Touch ID (or the Mac password) every time.
@@ -281,7 +288,7 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 - **Structure:** the popup is the dock pill at the cursor, with a list card under it.
   - The card uses the same material, an 18 pt corner radius, and is about 360 pt wide.
   - Rows are 36 pt tall, with at most 8 visible.
-- **Dock icons, left to right:** History, Saved (was Pinned, renamed 2026-11-11), Translate (⌘T), Paste all (⌘↩), Settings (⌘,). The toggle sits pinned at the right, and collapsing hides the list card so only the dock is left.
+- **Dock icons, left to right:** History, Saved (was Pinned, renamed 2026-11-11), Secrets (replaced Paste all on 2026-11-11, Omar; Paste all is still Space, then ⌘↩), Translate (⌘T), Settings (⌘,). The toggle sits pinned at the right, and collapsing hides the list card so only the dock is left.
 - **Tooltips:** each one shows the name and its shortcut chips, for example "Translate ⌘ T".
 - **Selected row:** a soft filled capsule that slides between rows (`matchedGeometryEffect`) with the tooltip-slide spring.
 - **HUDs** (Translating…, Copied, errors): a small pill at the cursor in the same material. It auto-dismisses after 600 ms, or after 1.5 s for errors.
@@ -361,8 +368,9 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 **Done when:**
 - [ ] ⌘K and a right-click open the actions menu, and each action works.
 - [ ] Hovering a row shows ⋯ and trash; deleting a saved item asks first.
-- [ ] ⌘N saves a named item; with ⌘L it's a secret that pastes after Touch ID, and the
-      clipboard afterwards matches what it was before.
+- [ ] ⌘N saves a named item. ⌘L on a copied key (or ⌘V in Secrets) saves it as a secret in
+      one step, removes the plain copy, and it pastes after Touch ID with the clipboard
+      afterwards matching what it was before.
 - [ ] The secret's value is in the Keychain and nowhere in ClipDock's files or logs.
 - [ ] ⌘E edits, then pastes (⌘↩) or saves (⌘S).
 - [ ] Unit tests pass for the actions list, text clean-up, keymaps, and saved-item storage.

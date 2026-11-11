@@ -57,15 +57,24 @@ extension PopupController {
         case .editSelected:
             if let item = model.selectedItem { run(.edit, on: item) }
         case .newSaved:
-            openEditor(for: nil)
+            openEditor(for: nil, secret: model.scope == .secrets)
         case .switchScope:
-            model.scope = model.scope == .history ? .saved : .history
+            model.scope = model.scope.next
+        case .previousScope:
+            model.scope = model.scope.previous
+        case .saveAsSecret:
+            if let item = model.selectedItem { run(.saveAsSecret, on: item) }
         case .selectAllText:
             searchField.currentEditor()?.selectAll(nil)
         case .cutText:
             searchField.currentEditor()?.cut(nil)
         case .pasteText:
-            searchField.currentEditor()?.paste(nil)
+            // In the Secrets tab, ⌘V with an empty search saves what you copied as a secret.
+            if model.scope == .secrets, model.query.isEmpty {
+                saveCopiedAsSecret()
+            } else {
+                searchField.currentEditor()?.paste(nil)
+            }
         }
     }
 
@@ -85,7 +94,7 @@ extension PopupController {
             model.moveActionHighlight(by: 1)
         case .pasteSelected:
             run(menu.actions[menu.highlighted], on: item)
-        case .toggleMark, .switchScope:
+        case .toggleMark, .switchScope, .previousScope:
             break
         default:
             model.actionMenu = nil
@@ -126,6 +135,8 @@ extension PopupController {
         case .togglePin:
             actions.togglePin(item)
             model.clampSelection()
+        case .saveAsSecret:
+            if let text = item.text { keepAsSecret(text, name: item.name) }
         case .uppercase, .lowercase, .tidy:
             pasteCleaned(item, action)
         case .delete:
@@ -172,6 +183,35 @@ extension PopupController {
         }
     }
 
+    /// ⌘V in the Secrets tab: saves the copied text as a secret, named automatically.
+    func saveCopiedAsSecret() {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              !text.allSatisfy(\.isWhitespace)
+        else {
+            actions.notify("Copy the key first, then press ⌘V here")
+            return
+        }
+        keepAsSecret(text, name: nil)
+    }
+
+    /// One step, no typing: the text goes to the Keychain, any plain copy leaves history, and
+    /// the Secrets tab opens with the new secret selected. ⌘E renames it.
+    private func keepAsSecret(_ text: String, name: String?) {
+        model.actionMenu = nil
+        Task {
+            do {
+                let secret = try await saved.saveSecret(text, name: name)
+                setQuery("")
+                model.scope = .secrets
+                model.select(secret)
+            } catch let problem as SavedItems.Problem {
+                actions.notify(problem.message)
+            } catch {
+                actions.notify("Couldn't save it")
+            }
+        }
+    }
+
     private func pasteCleaned(_ item: ClipItem, _ action: ClipAction) {
         guard let text = item.text else { return }
         let cleaned = switch action {
@@ -188,6 +228,7 @@ extension PopupController {
         case .edit: "Only text can be edited"
         case .pastePlain: item.kind == .image ? "Images have no text" : "That item has no formatting"
         case .togglePin: "Secrets are always saved"
+        case .saveAsSecret: item.isSecret ? "It's already a secret" : "Only text can be a secret"
         default: "Not for this item"
         }
     }

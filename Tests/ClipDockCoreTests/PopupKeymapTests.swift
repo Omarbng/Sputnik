@@ -62,8 +62,10 @@ struct PopupKeymapTests {
         #expect(command(0x0E, .command) == .editSelected)
         #expect(command(0x2D, .command) == .newSaved)
         #expect(command(0x30) == .switchScope)
-        #expect(command(0x30, .shift) == .switchScope)
+        #expect(command(0x30, .shift) == .previousScope)
+        #expect(command(0x25, .command) == .saveAsSecret)
         #expect(command(0x28) == nil)  // plain "k" types
+        #expect(command(0x25) == nil)  // plain "l" types
     }
 }
 

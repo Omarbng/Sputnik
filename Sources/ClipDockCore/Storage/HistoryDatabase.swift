@@ -136,14 +136,14 @@ public final class HistoryDatabase: Sendable {
 
     // MARK: - Private
 
-    private typealias Deletion = (removedIDs: [Int64], orphanBlobs: [String])
+    typealias Deletion = (removedIDs: [Int64], orphanBlobs: [String])
 
     private static func sweep(_ policy: RetentionPolicy, now: Date, in db: Database) throws -> Deletion {
         let ids = policy.expiredIDs(in: try ClipItem.fetchAll(db), now: now)
         return try deleteRows(ids, in: db)
     }
 
-    private static func deleteRows(_ ids: [Int64], in db: Database) throws -> Deletion {
+    static func deleteRows(_ ids: [Int64], in db: Database) throws -> Deletion {
         guard !ids.isEmpty else { return ([], []) }
         let doomed = try ClipItem.fetchAll(db, keys: ids)
         let blobNames = Set(doomed.flatMap { [$0.imageBlob, $0.rtfBlob].compactMap { $0 } })

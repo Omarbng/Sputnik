@@ -11,6 +11,8 @@ public enum ClipAction: String, CaseIterable, Sendable {
     case open
     /// ⌘P: add to Saved, or take it out.
     case togglePin
+    /// ⌘L: move it into the Keychain as a secret.
+    case saveAsSecret
     case uppercase
     case lowercase
     case tidy
@@ -27,10 +29,10 @@ public enum ClipAction: String, CaseIterable, Sendable {
         case .file:
             [.paste, .pastePlain, .copy, .open, .togglePin, .delete]
         case .url:
-            [.paste, .copy, .open, .edit, .togglePin, .delete]
+            [.paste, .copy, .open, .edit, .togglePin, .saveAsSecret, .delete]
         case .text:
             (item.rtfBlob != nil ? [.paste, .pastePlain] : [.paste])
-                + [.copy, .edit, .translate, .togglePin, .uppercase, .lowercase, .tidy, .delete]
+                + [.copy, .edit, .translate, .togglePin, .saveAsSecret, .uppercase, .lowercase, .tidy, .delete]
         }
     }
 
@@ -43,6 +45,7 @@ public enum ClipAction: String, CaseIterable, Sendable {
         case .translate: "Translate"
         case .open: item.kind == .file ? "Show in Finder" : "Open Link"
         case .togglePin: item.isPinned ? "Remove from Saved" : "Add to Saved"
+        case .saveAsSecret: "Save as Secret"
         case .uppercase: "Paste in UPPERCASE"
         case .lowercase: "Paste in lowercase"
         case .tidy: "Paste without Extra Spaces"
@@ -60,6 +63,7 @@ public enum ClipAction: String, CaseIterable, Sendable {
         case .translate: ["⌘", "T"]
         case .open: ["⌘", "O"]
         case .togglePin: ["⌘", "P"]
+        case .saveAsSecret: ["⌘", "L"]
         case .delete: ["⌘", "⌫"]
         case .uppercase, .lowercase, .tidy: []
         }

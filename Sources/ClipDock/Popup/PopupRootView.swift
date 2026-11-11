@@ -69,21 +69,13 @@ struct PopupRootView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tokens.mutedForeground)
                 HostedView(view: searchField)
-                if model.scope == .saved {
-                    Button { model.onNewSaved?() } label: {
-                        HStack(spacing: 5) {
-                            Text("Saved")
-                            Keycaps(keys: ["⌘", "N"], color: tokens.mutedForeground)
-                        }
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(tokens.mutedForeground)
-                        .padding(.leading, 8)
-                        .padding(.trailing, 3)
-                        .frame(height: 24)
-                        .background(tokens.accent, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help("New saved item (⌘N)")
+                switch model.scope {
+                case .saved:
+                    chip("New", keys: ["⌘", "N"], help: "Type in a new saved item", tokens) { model.onNewSaved?() }
+                case .secrets:
+                    chip("Save copied", keys: ["⌘", "V"], help: "Save what you copied as a secret", tokens) { model.onSaveCopiedSecret?() }
+                case .history:
+                    EmptyView()
                 }
             }
             .padding(.horizontal, 14)
@@ -93,6 +85,25 @@ struct PopupRootView: View {
 
             PopupListView(model: model, icons: icons, thumbnails: thumbnails)
         }
+    }
+
+    /// The tab's main action, at the right of the search bar.
+    private func chip(_ title: String, keys: [String], help: String, _ tokens: Tokens, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Text(title)
+                Keycaps(keys: keys, color: tokens.mutedForeground)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(tokens.mutedForeground)
+            .padding(.leading, 8)
+            .padding(.trailing, 3)
+            .frame(height: 24)
+            .background(tokens.accent, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .fixedSize()
     }
 }
 

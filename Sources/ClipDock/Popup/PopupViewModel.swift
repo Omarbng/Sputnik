@@ -85,6 +85,7 @@ final class PopupViewModel {
     @ObservationIgnored var onRunAction: ((ClipAction, ClipItem) -> Void)?
     @ObservationIgnored var onEditorCommand: ((EditorCommand) -> Void)?
     @ObservationIgnored var onNewSaved: (() -> Void)?
+    @ObservationIgnored var onSaveCopiedSecret: (() -> Void)?
 
     private let history: HistoryModel
 
@@ -96,7 +97,7 @@ final class PopupViewModel {
         HistoryFilter.sections(of: history.items, query: query, keys: history.searchKeys, scope: scope)
     }
 
-    var hasSaved: Bool { history.items.contains { $0.isPinned } }
+    var hasSaved: Bool { history.items.contains { $0.isPinned && !$0.isSecret } }
 
     var selectedItem: ClipItem? { item(at: selectedIndex) }
 

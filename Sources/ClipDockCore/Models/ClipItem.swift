@@ -101,6 +101,7 @@ extension ClipItem: FetchableRecord, MutablePersistableRecord {
         public static let imageBlob = Column(CodingKeys.imageBlob)
         public static let lastUsedAt = Column(CodingKeys.lastUsedAt)
         public static let isPinned = Column(CodingKeys.isPinned)
+        public static let kind = Column(CodingKeys.kind)
     }
 
     public mutating func didInsert(_ inserted: InsertionSuccess) {

@@ -80,6 +80,7 @@ struct DockView: View {
         switch item {
         case .history: model.scope == .history
         case .saved: model.scope == .saved
+        case .secrets: model.scope == .secrets
         default: false
         }
     }
@@ -87,7 +88,6 @@ struct DockView: View {
     private func showsBadge(_ item: DockItem) -> Bool {
         switch item {
         case .saved: model.hasSaved
-        case .pasteAll: !model.marks.isEmpty
         default: false
         }
     }

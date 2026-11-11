@@ -33,15 +33,31 @@ extension HistoryDatabase {
 
     /// Stores a secret's row: its name and Keychain reference only, never the value.
     public func saveSecret(name: String, secretRef: String, now: Date) throws -> ClipItem {
-        try queue.write { db in
+        try saveSecret(name: name, secretRef: secretRef, now: now, removingPlainCopies: []).item
+    }
+
+    /// Stores a secret's row and, in the same transaction, deletes the plain-text copies of
+    /// its value from history (matched by content hash), so the key isn't kept twice.
+    public func saveSecret(
+        name: String, secretRef: String, now: Date, removingPlainCopies hashes: [String]
+    ) throws -> (item: ClipItem, removedIDs: [Int64]) {
+        let (item, deletion) = try queue.write { db -> (ClipItem, Deletion) in
             var item = ClipItem(
                 kind: .secret, text: nil, contentHash: "secret:" + secretRef,
                 byteSize: 0, createdAt: now, lastUsedAt: now, isPinned: true,
                 name: name, secretRef: secretRef
             )
             try item.insert(db)
-            return item
+            let copies = hashes.isEmpty ? [] : try Int64.fetchAll(
+                db,
+                ClipItem.select(ClipItem.Columns.id)
+                    .filter(hashes.contains(ClipItem.Columns.contentHash))
+                    .filter(ClipItem.Columns.kind != ClipKind.secret.rawValue)
+            )
+            return (item, try Self.deleteRows(copies, in: db))
         }
+        deletion.orphanBlobs.forEach(blobs.remove)
+        return (item, deletion.removedIDs)
     }
 
     /// Saves an edit and moves the item to the top. `text` nil keeps the content (secrets, or

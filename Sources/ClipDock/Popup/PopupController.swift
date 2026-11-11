@@ -55,7 +55,8 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         model.onRequestDelete = { [weak self] item in self?.requestDelete(item) }
         model.onRunAction = { [weak self] action, item in self?.run(action, on: item) }
         model.onEditorCommand = { [weak self] command in self?.handleEditor(command) }
-        model.onNewSaved = { [weak self] in self?.openEditor(for: nil) }
+        model.onNewSaved = { [weak self] in self?.perform(.newSaved) }
+        model.onSaveCopiedSecret = { [weak self] in self?.saveCopiedAsSecret() }
         editorFields.onSubmitSecret = { [weak self] in self?.handleEditor(.save) }
         panel.contentView = hosting
         panel.setContentSize(PopupLayout.windowSize)
@@ -126,8 +127,8 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         switch item {
         case .history: model.scope = .history
         case .saved: model.scope = model.scope == .saved ? .history : .saved
+        case .secrets: model.scope = model.scope == .secrets ? .history : .secrets
         case .translate: perform(.translateSelected)
-        case .pasteAll: perform(.pasteMarked)
         case .settings: perform(.openSettings)
         case .toggle: model.isCollapsed.toggle()
         }

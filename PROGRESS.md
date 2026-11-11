@@ -296,6 +296,17 @@
 - Omar's history, clipboard, and Keychain were left as they were: test rows and the test
   Keychain items were removed, and the everyday build was reinstalled.
 
+### One-step secrets (2026-11-11, idle-gated burst)
+- 101 unit tests pass (secret names, the Secrets scope, ⌘L and ⇧⇥, Save as Secret in the
+  menu, and saving a secret that removes its plain copies and their blobs).
+- ⌘L on a copied `OPENAI_API_KEY=…` line: secret "OPENAI_API_KEY", plain copy gone, Secrets tab
+  open with it selected. ⌘V in Secrets with a bare `sk-proj-…` key: "OpenAI key", plain copy
+  gone. ⌘N in Secrets: focus starts in the secret field; ↩ saved it as "Secret".
+- Pasting a secret from the Secrets tab worked. ⇧⇥ went back a tab. The actions menu shows
+  all 11 actions inside the card (snapshot).
+- The first attempt was refused by the guard when Omar switched to Chrome; the retry ran once
+  the Mac was idle. Test secrets were removed by ID; Omar's 4 saved items were untouched.
+
 ## M5b decisions (2026-11-11)
 - **Omar chose** (AskUserQuestion): all four extra actions (plain text, open/show, edit, clean
   up); a Saved tab with Keychain secrets; saved items in every search; and "picking acts,
@@ -319,7 +330,14 @@
   target app as the source.
 - **Deleting a saved item asks first** (second ⌘⌫ or click), because typed-in items and
   secrets can't be copied again.
-- **⇥ switches History/Saved**, so the Saved tab works without the mouse.
+- **⇥ / ⇧⇥ move through the tabs**, so they all work without the mouse.
+- **Secrets got their own tab, and saving one became one step** (Omar, 2026-11-11: "make it
+  easier… I don't need to do N L"). ⌘L converts a copied item; ⌘V in the Secrets tab saves the
+  clipboard; names come from `SecretNamer` (variable name, known key prefix, or "Secret N").
+  The secret's row and the deletion of its plain copies happen in one transaction. Values
+  are trimmed of surrounding whitespace and newlines (a key copied from a terminal often ends
+  in one). The Secrets button replaced Paste all in the dock, as Omar asked; Paste all is
+  still Space, then ⌘↩.
 - **Test builds** (`CLIPDOCK_TEST_BUILD=1 ./run.sh`) compile in a Touch ID skip and a
   "⌘V only into the test target" guard, both off unless launched with their environment
   variables. The everyday build has neither.

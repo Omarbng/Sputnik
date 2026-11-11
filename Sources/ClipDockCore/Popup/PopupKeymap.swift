@@ -28,8 +28,12 @@ public enum PopupCommand: Equatable, Sendable {
     case editSelected
     /// ⌘N: type in a new saved item.
     case newSaved
-    /// ⇥: switch between History and Saved.
+    /// ⇥: the next tab (History → Saved → Secrets).
     case switchScope
+    /// ⇧⇥: the previous tab.
+    case previousScope
+    /// ⌘L: keep the selected item as a secret, and remove its plain copy from history.
+    case saveAsSecret
     // Editing in the search field. A menu-bar app has no Edit menu to supply these.
     case selectAllText
     case cutText
@@ -92,7 +96,7 @@ public enum PopupKeymap {
             return .pastePlain
         }
         if modifiers == .shift, keyCode == tab {
-            return .switchScope
+            return .previousScope
         }
         if modifiers == .command {
             if let number = digits[keyCode] { return .pasteNumber(number) }
@@ -107,6 +111,7 @@ public enum PopupKeymap {
             case o: return .openSelected
             case e: return .editSelected
             case n: return .newSaved
+            case l: return .saveAsSecret
             case a: return .selectAllText
             case x: return .cutText
             case v: return .pasteText

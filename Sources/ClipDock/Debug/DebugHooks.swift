@@ -29,7 +29,7 @@ import ClipDockCore
 ///   clearHistoryNow                Clear history without the confirmation alert
 ///   pause {seconds} / resume       Pause capture (seconds < 0: until resumed)
 ///   settingsState                  log the saved settings
-///   dock {text: name}              press a dock button (history, saved, translate, pasteAll, settings, toggle)
+///   dock {text: name}              press a dock button (history, saved, secrets, translate, settings, toggle)
 ///   hover {text: name}             pretend the pointer is over a dock button ("" clears it)
 ///   snapshot {text: path}          render the popup to a PNG (the behind-window blur doesn't render)
 ///   focused {text}                 log whether the focused text field contains `text`
@@ -166,7 +166,7 @@ final class DebugHooks {
                 ids=\(ids, privacy: .public) \
                 marks=\(model.marks.ids.map(String.init).joined(separator: ","), privacy: .public) \
                 saved=\(model.sections.saved.compactMap(\.id).map(String.init).joined(separator: ","), privacy: .public) \
-                scope=\(model.scope == .saved ? "saved" : "history", privacy: .public) \
+                scope=\(String(describing: model.scope), privacy: .public) \
                 kinds=\(model.sections.all.prefix(10).map(\.kind.rawValue).joined(separator: ","), privacy: .public) \
                 menu=\(model.actionMenu.map { "\($0.itemID):\($0.actions.map(\.rawValue).joined(separator: "+"))@\($0.highlighted)" } ?? "none", privacy: .public) \
                 editor=\(Self.describe(model.editor), privacy: .public) \
@@ -270,7 +270,7 @@ final class DebugHooks {
 
     private static func dockItem(_ name: String?) -> DockItem? {
         ["history": DockItem.history, "saved": .saved, "pinned": .saved, "translate": .translate,
-         "pasteAll": .pasteAll, "settings": .settings, "toggle": .toggle][name ?? ""]
+         "secrets": .secrets, "settings": .settings, "toggle": .toggle][name ?? ""]
     }
 
     /// State and length only, never the text.
