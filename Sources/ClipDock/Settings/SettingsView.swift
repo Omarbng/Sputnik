@@ -27,6 +27,13 @@ struct SettingsView: View {
                 note("Use these if you'd rather press a combination, such as ⌘⇧V.")
             }
 
+            Section("Translation") {
+                Picker("Translate English into", selection: $model.englishTarget) {
+                    ForEach(TranslationLanguage.englishTargets, id: \.self) { Text($0.name).tag($0) }
+                }
+                note("French and Russian always translate into English.")
+            }
+
             Section("History") {
                 Stepper("Keep up to \(model.maxItems) items", value: $model.maxItems, in: 50...5_000, step: 50)
                 Stepper("Delete items after \(model.retentionDays) days", value: $model.retentionDays, in: 1...365)
@@ -63,12 +70,12 @@ struct SettingsView: View {
                           ok: model.accessibilityGranted, button: "Open Settings", action: actions.openAccessibilitySettings)
                 statusRow("Paste from Other Apps", detail: "To save what you copy",
                           ok: model.pasteAllowed, button: "Open Settings", action: actions.openPasteSettings)
-                statusRow("Translation languages", detail: "English and Russian, on this Mac",
+                statusRow("Translation languages", detail: "English, Russian and French, on this Mac",
                           ok: model.languagesInstalled, button: "Download…", action: actions.downloadLanguages)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 660)
+        .frame(width: 460, height: 720)
     }
 
     private func tapPicker(_ title: String, selection: Binding<TapModifier?>) -> some View {

@@ -13,6 +13,9 @@
   (see below)
 - [x] **M5b — Clip actions and Saved items** (2026-11-11, Omar's request; see "M5b test
   results"). Needs Omar to try Touch ID, right-click, and the row buttons himself.
+- [x] **French** (2026-11-18, Omar's request; see "French translation"). French and Russian
+  translate into English; English into Russian, or French via Settings. Omar must confirm the
+  French download in the macOS prompt.
 - [ ] M6 — Claude translation (optional; Omar hasn't decided yet)
 - [ ] **M7 — Dictation (planned, Omar's request on 2026-11-11):** after ClipDock is finished,
   write up what an on-device voice-dictation feature would take, in quality, effort, and
@@ -342,7 +345,31 @@
   "⌘V only into the test target" guard, both off unless launched with their environment
   variables. The everyday build has neither.
 
+## French translation (2026-11-18)
+- **Omar asked:** download French, and translate any foreign language into English only
+  ("if I'm translating French, it should only come in English, not in Russian").
+- **Detection:** Cyrillic share > 30% → Russian (unchanged). Otherwise `NLLanguageRecognizer`
+  limited to English, French and Russian; French needs ≥ 60% confidence, so one-word
+  borrowings ("menu") stay English. Probed on this Mac: "Merci", "Bonjour", "D'accord",
+  "facture" → French; "OK", "Thanks", "Call José at 5", "Let's meet at the café" → English.
+  Other languages (German, Spanish) aren't supported; they're treated as English or French.
+- **English goes into Russian by default.** Omar didn't say what English should become, so the
+  old behavior stays, and Settings → Translation → "Translate English into" can switch it to
+  French. All four directions' files are requested, so the switch works at once.
+- `TranslationDirection` is now a source/target pair of `TranslationLanguage` (en, ru, fr)
+  instead of a two-case enum. The ⌘T path logs `row direction=fr-en chars=N` (ids only).
+- 104 unit tests pass (French detection, the English target setting, direction labels).
+- **The language card was offered once more** (`didShowLanguageCard.french`), because the
+  French files were new. It asks only for missing pairs; English and Russian were installed.
+
 ## Known issues
+- **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
+  2026-11-18.** On a slow connection (~30 KB/s that day) SwiftPM's full clone of GRDB hung.
+  Fix used: `git clone --bare --depth 1 --branch v7.12.0 https://github.com/groue/GRDB.swift.git`,
+  copy it to `~/Library/Caches/ClipDock-build/swiftpm/repositories/GRDB.swift-dd0599db`, set
+  `remote.origin.mirror true` and fetch `+refs/*:refs/*`, then `swift package resolve`. The pinned
+  revision is in the shallow copy, so SwiftPM doesn't fetch. The GRDB submodule (SQLiteLib) is
+  still fetched in full; it's small.
 - **After a rebuild, the first use of each secret shows a Keychain password prompt**
   ("ClipDock wants to use your confidential information…"). The self-signed certificate has
   no Team ID, so the Keychain ties the item to the exact build. Choose **Always Allow**. It
@@ -368,5 +395,4 @@
 - The 1Password (`com.1password.1password`, `com.agilebits.onepassword7`) and Bitwarden
   (`com.bitwarden.desktop`) bundle IDs aren't verified, because neither app is installed.
   Both also mark copies with `ConcealedType`, which is skipped anyway.
-- Disk space is tight (about 1.5 GB free). Quitting Cursor installs its pending update and
-  frees about 1.4 GB.
+- Disk space: 31 GB free on 2026-11-18 (it was about 1.5 GB on 2026-11-11).

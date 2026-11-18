@@ -1,6 +1,6 @@
 # ClipDock — build brief
 
-A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers English ⇄ Russian translation as an action. It's a personal tool, so it isn't for the App Store or for sharing.
+A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). It's a personal tool, so it isn't for the App Store or for sharing.
 
 **What matters most**
 
@@ -36,7 +36,7 @@ A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has
 | Storage | [GRDB.swift](https://github.com/groue/GRDB.swift) (SQLite) in `~/Library/Application Support/ClipDock/`. Images and files go in a `blobs/` subfolder, named by content hash. |
 | Launch at login | `SMAppService.mainApp` |
 | Translation | Apple's **Translation** framework, which runs on the device. Claude API mode is optional and comes in M6. |
-| Language detection | If more than 30% of the letters are Cyrillic, the text is Russian. Fall back to `NLLanguageRecognizer`. |
+| Language detection | If more than 30% of the letters are Cyrillic, the text is Russian. Otherwise `NLLanguageRecognizer`, limited to English, French and Russian, decides; French needs 60%+ confidence. Anything else counts as English. |
 | Bundle id | `com.omar.clipdock`. Omar can change this. |
 
 ---
@@ -143,7 +143,8 @@ combos (such as ⌘⇧V) can still be recorded there.
 **In place (⌥⌘T), with text selected in any app:**
 1. Save the full current pasteboard contents, with all items and types.
 2. Send ⌘C. Wait for `changeCount` to change, with a 300 ms timeout. If nothing changes, show the HUD "Select some text first" and stop.
-3. Detect the language. Russian text becomes English, and everything else becomes Russian.
+3. Detect the language. **Changed 2026-11-18 (Omar): foreign text always becomes English.** Russian and French
+   become English. English becomes Russian, or French if Omar picks that in Settings ("Translate English into").
 4. Translate it. If that takes more than 150 ms, show a small "Translating…" HUD at the cursor.
 5. Write the translation to the pasteboard, marked internal, and send ⌘V. This replaces the selection.
 6. After about 500 ms, restore the original pasteboard contents.
@@ -155,7 +156,7 @@ combos (such as ⌘⇧V) can still be recorded there.
 **From the popup (⌘T):** the translation appears under the selected row. ↩ pastes the translation and ⌘C copies it.
 
 **Apple engine:**
-- **First run:** check `LanguageAvailability.status(from:to:)` for en→ru and ru→en. If either pair isn't installed, call `prepareTranslation()` during onboarding so the system download prompt appears once.
+- **First run:** check `LanguageAvailability.status(from:to:)` for en→ru, ru→en, fr→en and en→fr. If any pair isn't installed, call `prepareTranslation()` during onboarding so the system download prompt appears once for each missing language. (The card was offered once more when French was added.)
 - **Getting a session:**
   - On macOS 26.4+, create one directly with `TranslationSession(installedSource:target:)`, which needs no UI.
   - On older versions, the only way to get a session is SwiftUI's `.translationTask`. Host a tiny invisible SwiftUI view that lives as long as the app, owns the `.translationTask`, and serves requests through an async queue.
@@ -183,6 +184,7 @@ Keep it small, with these settings:
 - history limit and retention days
 - ignored apps
 - paste-all separator
+- what English translates into (Russian or French)
 - translation engine, API key, and model id
 - launch at login
 - **permission status:** Accessibility and Paste from Other Apps, each with an "Open Settings" button

@@ -12,7 +12,9 @@ enum AppSettings {
         static let didShowPasteAccessCard = "didShowPasteAccessCard"
         static let didShowAccessibilityCard = "didShowAccessibilityCard"
         static let didPromptAccessibility = "didPromptAccessibility"
-        static let didShowLanguageCard = "didShowLanguageCard"
+        /// Renamed when French was added (2026-11-18), so the card offers that download once.
+        static let didShowLanguageCard = "didShowLanguageCard.french"
+        static let englishTarget = "translateEnglishInto"
         static let pasteAllSeparator = "pasteAllSeparator"
         static let pausedUntil = "pausedUntil"
         static let popupTap = "popupDoubleTap"
@@ -45,6 +47,17 @@ enum AppSettings {
             defaults.removeObject(forKey: "KeyboardShortcuts_" + name)
         }
         defaults.set(true, forKey: Key.didMigrateToDoubleTaps)
+    }
+
+    /// What English text is translated into: Russian (the default) or French.
+    static var englishTarget: TranslationLanguage {
+        get {
+            defaults.string(forKey: Key.englishTarget)
+                .flatMap(TranslationLanguage.init(rawValue:))
+                .flatMap { TranslationLanguage.englishTargets.contains($0) ? $0 : nil }
+                ?? TranslationLanguage.englishTargets[0]
+        }
+        set { defaults.set(newValue.rawValue, forKey: Key.englishTarget) }
     }
 
     static var ignoredBundleIDs: [String] {

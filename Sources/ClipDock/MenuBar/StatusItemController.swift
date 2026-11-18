@@ -81,7 +81,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
         if actions.needsLanguages() {
             let download = item("Download Translation Languages…", #selector(downloadLanguages))
-            download.subtitle = "English and Russian, for offline translation"
+            download.subtitle = "English, Russian and French, for offline translation"
             menu.addItem(download)
             added = true
         }

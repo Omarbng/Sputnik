@@ -1,6 +1,6 @@
 import AppKit
 
-/// Shows the language download card and closes it once both directions are installed.
+/// Shows the language download card and closes it once every direction is installed.
 @MainActor
 final class LanguagePackCardController {
     private let card = CardWindow()

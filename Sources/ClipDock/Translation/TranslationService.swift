@@ -49,7 +49,14 @@ final class TranslationService {
 
     /// For ⌘T in the popup. The row shows progress, so there's no HUD.
     func translate(_ text: String) async throws -> String {
-        try await translator.translate(text, direction: LanguageDetector.direction(for: text))
+        let direction = Self.direction(for: text)
+        Log.translate.notice("row direction=\(direction.id, privacy: .public) chars=\(text.count, privacy: .public)")
+        return try await translator.translate(text, direction: direction)
+    }
+
+    /// French and Russian go into English; English goes into the language picked in Settings.
+    static func direction(for text: String) -> TranslationDirection {
+        LanguageDetector.direction(for: text, englishTarget: AppSettings.englishTarget)
     }
 
     /// Adds a translation to history with the "translated" badge.
@@ -68,7 +75,7 @@ final class TranslationService {
         Log.translate.error("failed: \(String(describing: error), privacy: .public)")
         if LanguagePacks.isNotInstalled(error) {
             hooks.needsLanguagePacks()
-            return "Download English and Russian first"
+            return "Download the language files first"
         }
         return "Translation failed"
     }
@@ -88,7 +95,7 @@ final class TranslationService {
             Log.translate.notice("stopped reason=\(grabbed == .nothingCopied ? "nothingCopied" : "notText", privacy: .public)")
             return
         }
-        let direction = LanguageDetector.direction(for: selection)
+        let direction = Self.direction(for: selection)
         do {
             let translation = try await translateShowingProgress(selection, direction: direction)
             card.show(
@@ -102,7 +109,7 @@ final class TranslationService {
                 }
             )
             Log.translate.notice("""
-                card direction=\(direction.rawValue, privacy: .public) \
+                card direction=\(direction.id, privacy: .public) \
                 chars=\(selection.count, privacy: .public)->\(translation.count, privacy: .public)
                 """)
         } catch {

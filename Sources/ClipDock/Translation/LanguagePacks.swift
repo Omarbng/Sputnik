@@ -6,7 +6,7 @@ enum LanguagePacks {
     static func missingDirections() async -> [TranslationDirection] {
         let availability = LanguageAvailability()
         var missing: [TranslationDirection] = []
-        for direction in TranslationDirection.allCases {
+        for direction in TranslationDirection.all {
             let status = await availability.status(from: direction.sourceLanguage, to: direction.targetLanguage)
             if status != .installed { missing.append(direction) }
         }

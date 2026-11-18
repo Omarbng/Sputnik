@@ -132,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("""
             settings popupTap=\(AppSettings.popupTap?.rawValue ?? "off", privacy: .public) \
             translateTap=\(AppSettings.translateTap?.rawValue ?? "off", privacy: .public) \
+            englishInto=\(AppSettings.englishTarget.code, privacy: .public) \
             maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
             days=\(AppSettings.retentionDays, privacy: .public) \
             separator=\(AppSettings.pasteAllSeparator.rawValue, privacy: .public) \

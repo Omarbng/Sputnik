@@ -29,6 +29,9 @@ final class SettingsModel {
         }
     }
 
+    var englishTarget = AppSettings.englishTarget {
+        didSet { AppSettings.englishTarget = englishTarget }
+    }
     var separator = AppSettings.pasteAllSeparator {
         didSet { AppSettings.pasteAllSeparator = separator }
     }
@@ -49,6 +52,7 @@ final class SettingsModel {
         maxItems = AppSettings.maxUnpinnedItems
         retentionDays = AppSettings.retentionDays
         separator = AppSettings.pasteAllSeparator
+        englishTarget = AppSettings.englishTarget
         ignoredApps = AppSettings.ignoredBundleIDs
         popupTap = AppSettings.popupTap
         translateTap = AppSettings.translateTap
