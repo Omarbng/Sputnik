@@ -29,6 +29,9 @@ delivered, so a check made a moment earlier in a script isn't enough. Rules sinc
   reaches it; send a harmless → first. (A physical keyboard always sends key codes.)
 
 Running the paste target as an app, so `open` brings it to the front:
+(macOS deletes files in `/tmp` that are a few days old, so rebuild it when `open` fails with
+"Launchd job spawn failed". A locked Mac also can't bring it to the front; skip bursts while
+`lsappinfo front` is `com.apple.loginwindow`.)
 
 ```sh
 T=/tmp/CDTarget.app; mkdir -p $T/Contents/MacOS

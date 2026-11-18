@@ -359,6 +359,17 @@
 - `TranslationDirection` is now a source/target pair of `TranslationLanguage` (en, ru, fr)
   instead of a two-case enum. The ⌘T path logs `row direction=fr-en chars=N` (ids only).
 - 104 unit tests pass (French detection, the English target setting, direction labels).
+- Omar confirmed the download on 2026-11-18; all four directions report `installed`. The real
+  engine, from a standalone script (test sentences, no UI): "Pouvez-vous m'envoyer le contrat
+  signé avant vendredi ?" → "Can you send me the signed contract before Friday?"; EN → FR →
+  "Veuillez envoyer le contrat signé avant vendredi."; RU → EN and EN → RU also correct.
+- **End to end in the app** (test build, real Apple engine, idle-gated burst, CDTarget window
+  with the text selected, ⌃⌃ via the `translate` hook): French → card `fr-en` (55→50 chars),
+  Russian → `ru-en`, English → `en-ru`; with "Translate English into" = French, English →
+  `en-fr` and French still → `fr-en`. Clipboard byte-identical before and after; nothing added
+  to history. The character counts match the standalone engine results.
+  - Test-script lesson: ClipDock's own ⌘C resets `HIDIdleTime`, so later cases check that the
+    Mac has been idle since that keypress, not for 20 s.
 - **The language card was offered once more** (`didShowLanguageCard.french`), because the
   French files were new. It asks only for missing pairs; English and Russian were installed.
 
