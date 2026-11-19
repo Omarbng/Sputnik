@@ -17,10 +17,9 @@
   translate into English; English into Russian, or French via Settings. Omar must confirm the
   French download in the macOS prompt.
 - [ ] M6 — Claude translation (optional; Omar hasn't decided yet)
-- [ ] **M7 — Dictation (planned, Omar's request on 2026-11-11):** after ClipDock is finished,
-  write up what an on-device voice-dictation feature would take, in quality, effort, and
-  what it can and can't match in Wispr Flow, before building anything. It's outside the
-  brief's original scope (section 9).
+- [ ] **M7 — Dictation (Omar's request on 2026-11-11):** the write-up is done
+  (`DICTATION.md`, 2026-11-19). Nothing is built until Omar answers its four decisions. It's
+  outside the brief's original scope (section 9).
 
 ## How to build and test
 - `./run.sh` builds, signs, installs to `~/Applications/ClipDock.app`, and relaunches.
