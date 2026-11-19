@@ -67,7 +67,6 @@ final class DictationController {
             begin()
         case .confirm(let handsFree):
             guard audio != nil else { return }
-            pill.state.handsFree = handsFree
             pill.state.phase = .listening
             pill.show()
             if handsFree { limitHandsFree() }
@@ -124,8 +123,7 @@ final class DictationController {
         self.audio = audio
         startedAt = .now
         state.mode = .dictate
-        state.preview = ""
-        state.handsFree = false
+        state.phase = .listening
         if AppSettings.isOn(.dictationPolish) || AppSettings.isOn(.voiceCommands) { deps.writing.prewarm() }
         sessionTask = Task { [weak self] in
             await self?.openSession(for: audio, generation: current)
@@ -173,8 +171,6 @@ final class DictationController {
                 await session.cancel()
                 return nil
             }
-            let state = pill.state
-            session.onPreview = { text in state.preview = text }
             audio.setFormat(session.audioFormat)
             try await session.start(stream)
             return session
@@ -220,7 +216,7 @@ final class DictationController {
             return
         }
         isFinishing = true
-        pill.state.phase = .working("Transcribing…")
+        pill.state.phase = .working
         Task {
             defer {
                 isFinishing = false
@@ -259,7 +255,7 @@ final class DictationController {
         }
         var text = spoken
         if AppSettings.isOn(.dictationPolish), deps.writing.isAvailable {
-            pill.state.phase = .working("Polishing…")
+            pill.state.phase = .working
             let style: RewriteStyle = language == .russian ? .dictationRussian : .dictation
             if let polished = try? await deps.writing.rewrite(spoken, style: style),
                RewriteStyle.isPlausibleCleanup(original: spoken, cleaned: polished) {
@@ -273,7 +269,7 @@ final class DictationController {
 
     /// fn + ⇧: Russian is typed in English; English in the reply language (or Settings').
     private func deliverTranslated(_ spoken: String) async {
-        pill.state.phase = .working("Translating…")
+        pill.state.phase = .working
         do {
             let translated = try await deps.translation.translate(spoken)
             await type(translated, isTranslation: true)
@@ -293,12 +289,12 @@ final class DictationController {
             if !(await insertSaved(named: name)) { deps.hud.show("No saved item called that", style: .error) }
             return
         }
-        pill.state.phase = .working("Reading the selection…")
+        pill.state.phase = .working
         guard let selection = await deps.inserter.selectedText() else {
             deps.hud.show("Select some text, then hold fn + ⌃ and say what to do", style: .error)
             return
         }
-        pill.state.phase = .working("Working…")
+        pill.state.phase = .working
         do {
             let result: String
             switch command {

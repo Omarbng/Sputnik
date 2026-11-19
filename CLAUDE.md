@@ -245,6 +245,8 @@ Keep it small, with these settings:
 - Hold fn → listen (audio in memory only) → recognise → clean-up rules → optional Apple
   Intelligence polish (English) → typed via clipboard + ⌘V + restore → history row "dictated".
 - Any other key while holding cancels, so fn shortcuts still work. Off while Wispr Flow runs.
+- The pill has no text (Omar, 2026-11-19): five centred dots that follow the voice, ripple while
+  working, and turn amber (fn + ⌃) or blue (fn + ⇧).
 - Voice commands: "insert <saved item name>"; fn + ⌃ on a selection: translate to …, proofread,
   shorter, professional, summarize, or any instruction (Apple Intelligence).
 - Settings: language (automatic / English / Russian), filler rules, polish, commands, personal

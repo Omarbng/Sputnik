@@ -7,13 +7,9 @@ import Speech
 /// languages on, both listen and `TranscriptPicker` keeps the one that understood.
 @MainActor
 final class SpeechSession {
-    /// The live text for the pill: finished phrases plus the one being heard.
-    var onPreview: ((String) -> Void)?
-
     private let analyzer: SpeechAnalyzer
     private let format: AVAudioFormat
     private var collectors: [(TranslationLanguage, Task<TranscriptCandidate, Never>)] = []
-    private var partials: [TranslationLanguage: String] = [:]
 
     private init(analyzer: SpeechAnalyzer, format: AVAudioFormat) {
         self.analyzer = analyzer
@@ -37,7 +33,7 @@ final class SpeechSession {
             case .english:
                 modules.append((language, SpeechTranscriber(
                     locale: Locale(identifier: "en_US"), transcriptionOptions: [],
-                    reportingOptions: [.volatileResults], attributeOptions: [.transcriptionConfidence]
+                    reportingOptions: [], attributeOptions: [.transcriptionConfidence]
                 )))
             case .russian:
                 modules.append((language, DictationTranscriber(
@@ -112,14 +108,8 @@ final class SpeechSession {
     where S.Element == (AttributedString, Bool) {
         var finished = AttributedString()
         do {
-            for try await (text, isFinal) in results {
-                if isFinal {
-                    finished += text
-                    partials[language] = String(finished.characters)
-                } else {
-                    partials[language] = String(finished.characters) + String(text.characters)
-                }
-                publishPreview()
+            for try await (text, isFinal) in results where isFinal {
+                finished += text
             }
         } catch {
             Log.dictation.notice("results ended language=\(language.code, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
@@ -129,13 +119,6 @@ final class SpeechSession {
             text: String(finished.characters).trimmingCharacters(in: .whitespacesAndNewlines),
             confidence: Self.confidence(of: finished)
         )
-    }
-
-    /// The live text from whichever recogniser seems to be understanding.
-    private func publishPreview() {
-        let candidates = partials.map { TranscriptCandidate(language: $0.key, text: $0.value, confidence: nil) }
-        guard let best = TranscriptPicker.pick(candidates) else { return }
-        onPreview?(best.text)
     }
 
     /// Average confidence over the text, weighted by length.

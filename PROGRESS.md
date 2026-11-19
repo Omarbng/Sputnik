@@ -426,8 +426,13 @@
   known, so nothing is lost on the first use) → `SpeechSession` (model retention: process
   lifetime; prewarmed 3 s after launch once the microphone is allowed) → `DictationCleanup` →
   polish → `TextInserter` (clipboard + ⌘V + restore) → history with `isDictation`.
-- **Pill:** bottom centre of the screen with the mouse (like Wispr), level meter, live text,
-  mode chip.
+- **Pill:** bottom centre of the screen with the mouse (like Wispr). **Changed 2026-11-19
+  (Omar: "remove the text… just a clean bar with the dots in the middle"):** no words at all,
+  only five centred dots: round at rest, stretching with the voice, a soft ripple while working.
+  fn + ⌃ tints them amber, fn + ⇧ blue. A 108×36 bar: solid shell with a hairline edge, an inner
+  core with a top highlight, a two-layer diffused shadow, and a spring in. Circular capsule ends
+  (the continuous-curve capsule drew stray hairlines past its ends). The live transcript and the
+  recognisers' volatile results were removed with the text.
 - **Russian punctuation:** Apple's Russian recogniser adds none, even with `.punctuation`. Apple
   Intelligence refuses Russian *instructions* (`unsupportedLanguageOrLocale`) and, with the
   English dictation prompt, answered 2 of 4 Russian samples in English. An English prompt that
