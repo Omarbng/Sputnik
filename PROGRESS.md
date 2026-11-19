@@ -450,6 +450,30 @@
   and status rows for the microphone, English/Russian speech (Download… for Russian), the fn key
   ("Press 🌐 key to" — read only; on this Mac it's "Start Dictation"), and Wispr Flow.
 
+## M8/M9 test results (2026-11-19, test build, idle-gated runs, CDTarget window)
+- 142 unit tests pass (link cleaning, sensitive detection and expiry, contacts, calendar file,
+  reply memory, paste stack, keys, the fn state machine, clean-up rules, English/Russian
+  picking, voice commands, near-miss names, the polish guards, model-output tidy-up).
+- **Dictation from audio files** (Mac voices, no microphone): English typed as "So I wanted to
+  check if we can meet on Thursday at four. Thanks." (polish applied "at 3, actually make it
+  four"); Russian typed as "Здравствуйте, пожалуйста, пришлите договор до пятницы, спасибо.";
+  fn+⇧ on Russian → "Hello, please send the contract by Friday, thank you"; fn+⌃ "Make it more
+  professional" on a selection → "We are still awaiting payment for invoice 4471. Kindly settle
+  this matter by this week."; fn+⌃ "Translate to Russian" → "Пожалуйста, отправьте подписанный
+  контракт до пятницы."; "Insert test snippet alpha" (heard "tests nippid") pasted the saved item.
+- **Clipboard:** ⌃⌃ with nothing selected → card `fr-en clipboard=true`; then English →
+  `en-fr reply=true`; a utm/fbclid link became `https://example.com/page?id=42` on the clipboard;
+  "482913" stored with 598 s left; ⇧Space/Esc Quick Look; ⌘K on a phone text lists WhatsApp,
+  Call, Calendar, then the writing actions; Proofread fixed "questoin… teh" and ↩ pasted it;
+  Copy Text in Image read "Invoice 4471 is due on Friday"; ⌘T on a French image → "Thank you for
+  your quick payment"; Copy as JPEG gave `public.jpeg` + a file; Remove Background on Eagle.heic
+  gave a PNG; the paste stack pasted THREE, then TWO and ONE on ⌘V, and restored the clipboard.
+- Clipboard byte-identical after each run; test rows removed by id; the everyday build back.
+- Not tested by Claude: Omar's own voice beyond his three WhatsApp dictations, real fn presses
+  (never posted: macOS and Wispr Flow would react), a real ⌘V moving the paste stack in another
+  app (the hook stands in for it), WhatsApp/FaceTime/Mail/Calendar opening, how the pill and the
+  Settings tabs look.
+
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
   2026-11-18.** On a slow connection (~30 KB/s that day) SwiftPM's full clone of GRDB hung.
