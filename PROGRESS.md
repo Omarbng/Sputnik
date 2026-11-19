@@ -428,6 +428,24 @@
   polish → `TextInserter` (clipboard + ⌘V + restore) → history with `isDictation`.
 - **Pill:** bottom centre of the screen with the mouse (like Wispr), level meter, live text,
   mode chip.
+- **Russian punctuation:** Apple's Russian recogniser adds none, even with `.punctuation`. Apple
+  Intelligence refuses Russian *instructions* (`unsupportedLanguageOrLocale`) and, with the
+  English dictation prompt, answered 2 of 4 Russian samples in English. An English prompt that
+  insists on a Russian reply (`RewriteStyle.dictationRussian`) kept all 8 runs Russian with good
+  punctuation. `isPlausibleCleanup` also rejects a change of alphabet (and length outside
+  0.4–1.5×), so a bad polish falls back to the plain text.
+- **Snippets:** the synthetic voice's "test snippet" was heard as "tests nippid". Saved items'
+  names now go into the recogniser's `contextualStrings`, and `SavedNameMatcher` falls back to
+  letter similarity (edit distance, ≥ 0.75).
+- **Polish output:** the model sometimes opens with "Sure! Here's the edited text:" and once
+  dropped a closing "Thanks.". The prompt now says to keep every sentence, and `RewriteOutput`
+  strips a preamble line unless those words were in what Omar said.
+- **Test-run lesson (2026-11-19):** stopping the waiter during a run left the burst, the test
+  build and the test window running for about a minute (they were cleaned up by hand: rows
+  295–299 by id, clipboard restored, everyday build reinstalled). The waiter now runs the burst
+  in the background and traps TERM/INT to clean up and reinstall the everyday build itself.
+- **Omar used it already** (23:17–23:18, WhatsApp, three dictations) after allowing the
+  microphone; Wispr Flow was quit. One polish was rejected by the length guard (44 → 82 chars).
 - **Settings → Dictation:** language, filler rules, polish, voice commands, personal dictionary,
   and status rows for the microphone, English/Russian speech (Download… for Russian), the fn key
   ("Press 🌐 key to" — read only; on this Mac it's "Start Dictation"), and Wispr Flow.

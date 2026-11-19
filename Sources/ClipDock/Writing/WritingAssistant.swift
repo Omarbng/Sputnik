@@ -42,15 +42,16 @@ final class WritingAssistant {
     }
 
     func rewrite(_ text: String, style: RewriteStyle) async throws -> String {
-        try await respond(to: style.prompt(for: text), chars: text.count, label: style.rawValue)
+        try await respond(to: style.prompt(for: text), original: text, label: style.rawValue)
     }
 
     /// A spoken instruction ("make it sound more confident") applied to a selection.
     func apply(instruction: String, to text: String) async throws -> String {
-        try await respond(to: RewriteStyle.prompt(instruction: instruction, text: text), chars: text.count, label: "instruction")
+        try await respond(to: RewriteStyle.prompt(instruction: instruction, text: text), original: text, label: "instruction")
     }
 
-    private func respond(to prompt: String, chars: Int, label: String) async throws -> String {
+    private func respond(to prompt: String, original: String, label: String) async throws -> String {
+        let chars = original.count
         guard isAvailable else { throw Unavailable(message: unavailableReason ?? "Apple Intelligence isn't available") }
         // Sessions keep a transcript, so each request gets a fresh one (the warm one first).
         let session = warmSession ?? LanguageModelSession(model: model, instructions: RewriteStyle.instructions)
@@ -58,7 +59,7 @@ final class WritingAssistant {
         let started = ContinuousClock.now
         do {
             let response = try await session.respond(to: prompt, options: Self.options)
-            let output = Self.unwrap(response.content)
+            let output = RewriteOutput.clean(response.content, original: original)
             Log.writing.notice("""
                 done style=\(label, privacy: .public) chars=\(chars, privacy: .public)->\(output.count, privacy: .public) \
                 ms=\(Self.milliseconds(since: started), privacy: .public)
@@ -68,23 +69,6 @@ final class WritingAssistant {
             Log.writing.error("failed style=\(label, privacy: .public) reason=\(Self.reason(error), privacy: .public)")
             throw Unavailable(message: Self.message(for: error))
         }
-    }
-
-    /// The model sometimes wraps its answer in quotes or a code fence.
-    static func unwrap(_ text: String) -> String {
-        var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if result.hasPrefix("```"), result.hasSuffix("```"), result.count > 6 {
-            result = String(result.dropFirst(3).dropLast(3))
-            if let newline = result.firstIndex(of: "\n"), !result[..<newline].contains(" ") {
-                result = String(result[result.index(after: newline)...])  // drop a language tag
-            }
-            result = result.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        for (open, close) in [("\"", "\""), ("“", "”"), ("«", "»")] where result.hasPrefix(open) && result.hasSuffix(close) && result.count > 2 {
-            let inner = result.dropFirst().dropLast()
-            if !inner.contains(open), !inner.contains(close) { result = String(inner) }
-        }
-        return result
     }
 
     private static func message(for error: LanguageModelSession.GenerationError) -> String {

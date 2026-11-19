@@ -67,11 +67,13 @@ public enum ClipAction: String, CaseIterable, Sendable {
         case .text:
             var actions: [ClipAction] = item.rtfBlob != nil ? [.paste, .pastePlain] : [.paste]
             actions += [.copy, .edit, .translate, .peek, .togglePin, .saveAsSecret]
-            if context.writingTools { actions += RewriteStyle.menuStyles.map(\.action) }
+            // A number, address or date found in the text is the likely reason for opening the
+            // menu, so those actions come before the writing ones.
             let found = ContactDetector.detect(in: item.text ?? "")
             if found.phone != nil { actions += [.whatsApp, .call] }
             if found.email != nil { actions.append(.email) }
             if found.date != nil { actions.append(.addToCalendar) }
+            if context.writingTools { actions += RewriteStyle.menuStyles.map(\.action) }
             return actions + [.uppercase, .lowercase, .tidy, .delete]
         }
     }
@@ -125,8 +127,8 @@ public enum ClipAction: String, CaseIterable, Sendable {
     public var group: Int {
         switch self {
         case .paste, .pastePlain, .copy, .edit, .translate, .peek, .open, .togglePin, .saveAsSecret: 0
-        case .proofread, .professional, .shorter, .summarize: 1
-        case .whatsApp, .call, .email, .addToCalendar: 2
+        case .whatsApp, .call, .email, .addToCalendar: 1
+        case .proofread, .professional, .shorter, .summarize: 2
         case .copyText, .pasteSmaller, .copyAsJPEG, .removeBackground: 3
         case .uppercase, .lowercase, .tidy: 4
         case .delete: 5

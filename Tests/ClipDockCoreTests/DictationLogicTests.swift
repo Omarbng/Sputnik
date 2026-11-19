@@ -187,3 +187,19 @@ struct DictationRobustnessTests {
         #expect(!RewriteStyle.isPlausibleCleanup(original: russian, cleaned: "Look, we need three things."))
     }
 }
+
+@Suite("Model output tidy-up")
+struct RewriteOutputTests {
+    @Test("Preambles, quotes and code fences go; the text stays")
+    func cleans() {
+        let said = "so we meet at four thanks"
+        #expect(RewriteOutput.clean("Sure! Here's the edited text:\nSo we meet at four. Thanks.", original: said) == "So we meet at four. Thanks.")
+        #expect(RewriteOutput.clean("Here is the cleaned up text:\n\nWe need three things.", original: "we need three things") == "We need three things.")
+        #expect(RewriteOutput.clean("Вот исправленный текст:\nПривет, Анна.", original: "привет анна") == "Привет, Анна.")
+        #expect(RewriteOutput.clean("“Thanks for the update.”", original: "thanks for the update") == "Thanks for the update.")
+        #expect(RewriteOutput.clean("```\nHello there\n```", original: "hello there") == "Hello there")
+        #expect(RewriteOutput.clean("Sure: the meeting is at four.", original: "sure the meeting is at four") == "Sure: the meeting is at four.")
+        // Omar's own opening words stay.
+        #expect(RewriteOutput.clean("Here's the plan:\n1. Send the contract", original: "here's the plan first send the contract") == "Here's the plan:\n1. Send the contract")
+    }
+}

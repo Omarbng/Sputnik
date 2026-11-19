@@ -61,14 +61,14 @@ public enum RewriteStyle: String, CaseIterable, Sendable {
             Clean up this dictated speech: fix punctuation and capitalization, remove filler \
             words (um, uh, you know) and false starts, and apply the speaker's self-corrections \
             ("at three, actually four" becomes "at four"). Format spoken lists as lists. Keep \
-            the speaker's words otherwise.
+            every sentence, including greetings and thanks, and the speaker's words otherwise.
             """
         case .dictationRussian:
             """
             The text below is Russian dictation. Clean it up: add punctuation and capitalization, \
             remove filler words (ну, э, вот, типа) and false starts, and apply the speaker's \
-            self-corrections. Your reply must be in Russian, the same language as the text. Do not \
-            translate it into English.
+            self-corrections. Keep every sentence, including greetings and thanks. Your reply must \
+            be in Russian, the same language as the text. Do not translate it into English.
             """
         }
     }
