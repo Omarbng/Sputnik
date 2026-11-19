@@ -109,7 +109,7 @@ struct PopupRootView: View {
             .frame(height: 24)
             .background(tokens.accent, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
         .help(help)
         .fixedSize()
     }

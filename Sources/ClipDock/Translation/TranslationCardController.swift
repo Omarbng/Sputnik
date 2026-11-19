@@ -53,6 +53,15 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
         panel.orderOut(nil)
     }
 
+    #if DEBUG
+    /// Debug snapshot (screenshots need Screen Recording).
+    func snapshot(to path: String) {
+        guard let view = panel.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+    #endif
+
     func windowDidResignKey(_ notification: Notification) {
         close()
     }
@@ -119,7 +128,7 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
 /// The show-only card: the dock's material, 18 pt corners, the direction, the translation, and
 /// a Copy button with its keycaps.
 struct TranslationCardView: View {
-    static let shadowMargin: CGFloat = 32
+    static let shadowMargin: CGFloat = 40  // the two-layer shadow reaches 40 pt below
 
     let text: String
     let direction: TranslationDirection
@@ -136,9 +145,14 @@ struct TranslationCardView: View {
         let tokens = Tokens.for(scheme)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(note.isEmpty ? direction.label : "\(direction.label) · \(note)")
-                    .font(.system(size: 11, weight: .semibold))
+                // An eyebrow chip: the direction, and "from clipboard" / "reply" when they apply.
+                Text((note.isEmpty ? direction.label : "\(direction.label) · \(note)").uppercased())
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.9)
                     .foregroundStyle(tokens.mutedForeground)
+                    .padding(.horizontal, 9)
+                    .frame(height: 20)
+                    .background(tokens.accent, in: Capsule())
                 Spacer()
                 Text("Esc to close")
                     .font(.system(size: 11))
@@ -164,18 +178,28 @@ struct TranslationCardView: View {
         .padding(Self.shadowMargin)
     }
 
-    /// Replace is the inverted (primary) button, Copy the quiet one.
+    /// Replace is the inverted (primary) button, Copy the quiet one. Each key sits in its own
+    /// small capsule, flush with the button's right end (a button within the button), and the
+    /// button presses in slightly when clicked.
     private func cardButton(_ title: String, keys: String, tokens: Tokens, prominent: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
+        let ink = prominent ? tokens.primaryForeground : tokens.foreground
+        return Button(action: action) {
+            HStack(spacing: 8) {
                 Text(title).font(.system(size: 13, weight: .medium)).tracking(-0.13)
-                Text(keys).font(.system(size: 11, weight: .medium)).opacity(0.6)
+                Text(keys)
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(0.75)
+                    .padding(.horizontal, 7)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(ink.opacity(0.1), in: Capsule())
             }
-            .foregroundStyle(prominent ? tokens.primaryForeground : tokens.foreground)
-            .padding(.horizontal, 12)
-            .frame(height: 28)
+            .foregroundStyle(ink)
+            .padding(.leading, 14)
+            .padding(.trailing, 4)
+            .frame(height: 30)
             .background(prominent ? tokens.primary : tokens.accent, in: Capsule())
+            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
     }
 }

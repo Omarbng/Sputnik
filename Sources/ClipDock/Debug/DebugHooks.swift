@@ -41,6 +41,9 @@ import ClipDockCore
 ///   pillSnapshot {text: path}      render the dictation pill to a PNG
 ///   stack {text: pasted|stop}      the paste stack: as if ⌘V was pressed, or stop it
 ///   historyFlags                   log the top items' ids with their badges and expiry
+///   appearance {text: dark|light|system}  ClipDock's own appearance (not the system's)
+///   cardSnapshot / hudSnapshot {text: path}  render the translation card or the HUD
+///   hud {text, field: info|error}  show a HUD message
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
@@ -51,7 +54,7 @@ final class DebugHooks {
     static let testTarget = "com.omar.clipdock.testtarget"
     private static let needsTestTarget: Set<String> = [
         "toggle", "dock", "translate", "card", "postDoubleTap", "key", "action", "editor", "fieldCommand", "rowActions",
-        "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow", "dictateFile", "fn", "stack",
+        "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow", "dictateFile", "fn", "stack", "hud",
     ]
     /// Posted keys and clicks must land in the popup itself.
     private static let needsPopupKey: Set<String> = ["postKey", "postText", "postMouse"]
@@ -66,6 +69,7 @@ final class DebugHooks {
         let dictation: DictationController
         let pasteStack: PasteStackController
         let history: HistoryModel
+        let hud: HUDController
     }
 
     init(targets: Targets) {
@@ -226,6 +230,18 @@ final class DebugHooks {
             case "stop": targets.pasteStack.stop(restore: true)
             default: break
             }
+        }
+        observe("appearance") { info in
+            NSApp.appearance = switch info.text {
+            case "dark": NSAppearance(named: .darkAqua)
+            case "light": NSAppearance(named: .aqua)
+            default: nil
+            }
+        }
+        observe("cardSnapshot") { info in if let path = info.text { targets.card.snapshot(to: path) } }
+        observe("hudSnapshot") { info in if let path = info.text { targets.hud.snapshot(to: path) } }
+        observe("hud") { info in
+            targets.hud.show(info.text ?? "Copied", style: info.field == "error" ? .error : .info, autoHide: false)
         }
         observe("historyFlags") { _ in
             let flags = targets.history.items.prefix(12).map { item in

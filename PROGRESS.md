@@ -479,6 +479,21 @@
   app (the hook stands in for it), WhatsApp/FaceTime/Mail/Calendar opening, how the pill and the
   Settings tabs look.
 
+## UI polish (2026-11-19, Omar: "use /soft-skill and polish the UI")
+- Kept section 5's layout, tokens, sizes and springs; refined the surfaces only.
+- **Shared surface (`MaterialBackground`):** a faint top-edge highlight; a two-layer shadow (wide
+  ambient plus a tight contact shadow) instead of one dark drop shadow; capsules with circular
+  ends (the continuous-curve capsule drew stray hairlines past its ends in light mode). Shadow
+  margins of the card and HUD grew to 40 pt so the softer shadow isn't clipped.
+- **HUD:** springs in (slight rise and scale) as it fades; quieter icon for confirmations.
+- **Translation card:** the direction is an eyebrow chip ("FR → EN · FROM CLIPBOARD"); each
+  button's key sits in its own capsule inside the button; buttons press in (`PressableStyle`).
+- **Actions menu:** rows fade out at the bottom when the list scrolls, so it doesn't look cut off.
+- **Quick Look:** the footer uses keycap chips like the menus.
+- **Row ⋯/trash buttons and tab chips** press in slightly.
+- Checked with snapshots of the popup, menu, card and HUD in dark and light (ClipDock's own
+  appearance switched by a debug hook, never the system's).
+
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
   2026-11-18.** On a slow connection (~30 KB/s that day) SwiftPM's full clone of GRDB hung.

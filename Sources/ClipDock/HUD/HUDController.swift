@@ -59,6 +59,15 @@ final class HUDController {
         }
     }
 
+    #if DEBUG
+    /// Debug snapshot (screenshots need Screen Recording).
+    func snapshot(to path: String) {
+        guard let view = panel.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+    #endif
+
     func hide() {
         hideTask?.cancel()
         guard panel.isVisible else { return }

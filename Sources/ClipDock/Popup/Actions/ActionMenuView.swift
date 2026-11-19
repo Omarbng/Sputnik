@@ -39,6 +39,18 @@ struct ActionMenuView: View {
                 }
                 .scrollIndicators(.never)
                 .frame(maxHeight: Self.listHeight(for: menu.actions))
+                // When it doesn't all fit, the last rows fade out, so it reads as "more below"
+                // rather than cut off.
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: Self.overflows(menu.actions) ? 0.86 : 1),
+                            .init(color: .black.opacity(Self.overflows(menu.actions) ? 0 : 1), location: 1),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                }
                 .onChange(of: menu.highlighted) { _, index in proxy.scrollTo(index) }
             }
         }
@@ -51,9 +63,16 @@ struct ActionMenuView: View {
 
     /// The rows' natural height, capped so the menu fits in the card.
     static func listHeight(for actions: [ClipAction]) -> CGFloat {
+        min(naturalHeight(of: actions), maxHeight - 30)
+    }
+
+    static func overflows(_ actions: [ClipAction]) -> Bool {
+        naturalHeight(of: actions) > maxHeight - 30
+    }
+
+    private static func naturalHeight(of actions: [ClipAction]) -> CGFloat {
         let dividers = zip(actions, actions.dropFirst()).filter { $0.group != $1.group }.count
-        let natural = CGFloat(actions.count) * rowHeight + CGFloat(dividers) * 5
-        return min(natural, maxHeight - 30)
+        return CGFloat(actions.count) * rowHeight + CGFloat(dividers) * 5
     }
 
     private func row(_ action: ClipAction, index: Int) -> some View {

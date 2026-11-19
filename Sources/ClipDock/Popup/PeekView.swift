@@ -20,13 +20,26 @@ struct PeekView: View {
             Rectangle().fill(tokens.border).frame(height: 1)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text("↑↓ next  ·  ↩ paste  ·  ⌘C copy  ·  esc close")
-                .font(.system(size: 11))
-                .foregroundStyle(tokens.mutedForeground)
-                .frame(maxWidth: .infinity)
-                .frame(height: 24)
+            HStack(spacing: 14) {
+                hint(["↑", "↓"], "next")
+                hint(["↩"], "paste")
+                hint(["⌘", "C"], "copy")
+                hint(["esc"], "close")
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
         }
         .task(id: item.id) { await loadImage() }
+    }
+
+    /// Keycaps and what they do, like the menus' shortcut chips.
+    private func hint(_ keys: [String], _ label: String) -> some View {
+        HStack(spacing: 5) {
+            Keycaps(keys: keys, color: tokens.mutedForeground)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(tokens.mutedForeground)
+        }
     }
 
     private var header: some View {

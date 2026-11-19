@@ -153,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             debugHooks = DebugHooks(targets: .init(
                 popup: popup, translation: translation, card: translationCard,
                 settings: settings, maintenance: maintenance, capture: capture,
-                dictation: dictation, pasteStack: pasteStack, history: history
+                dictation: dictation, pasteStack: pasteStack, history: history, hud: hud
             ))
         }
         #endif

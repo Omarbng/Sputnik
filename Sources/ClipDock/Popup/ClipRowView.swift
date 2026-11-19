@@ -175,7 +175,7 @@ private struct RowIconButton: View {
                 .background(hovered ? tokens.foreground.opacity(0.12) : .clear, in: Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle(scale: 0.9))
         .onHover { hovered = $0 }
         .help(help)
     }
