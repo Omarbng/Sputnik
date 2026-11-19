@@ -88,6 +88,20 @@ final class ItemActions {
         Log.paste.notice("paste derived chars=\(text.count, privacy: .public)")
     }
 
+    /// ⌘C on a rewrite shown under a row: copies it and adds it to history.
+    func copyDerived(_ text: String, closePopup: () -> Void) {
+        let target = NSWorkspace.shared.frontmostApplication
+        PasteboardWriter.write(text: text)
+        closePopup()
+        capture.record(CapturedClip(
+            payload: .fromText(text, rtf: nil),
+            sourceBundleID: target?.bundleIdentifier,
+            sourceAppName: target?.localizedName,
+            capturedAt: .now
+        ))
+        hud.show("Copied")
+    }
+
     /// ⌘O: opens a link in the default browser, or shows files in Finder.
     func open(_ item: ClipItem, closePopup: () -> Void) {
         switch item.kind {

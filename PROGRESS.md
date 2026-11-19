@@ -17,9 +17,11 @@
   translate into English; English into Russian, or French via Settings. Omar must confirm the
   French download in the macOS prompt.
 - [ ] M6 — Claude translation (optional; Omar hasn't decided yet)
-- [ ] **M7 — Dictation (Omar's request on 2026-11-11):** the write-up is done
-  (`DICTATION.md`, 2026-11-19). Nothing is built until Omar answers its four decisions. It's
-  outside the brief's original scope (section 9).
+- [x] **M7 — Dictation write-up** (`DICTATION.md`, 2026-11-19).
+- [x] **M8 — Clipboard features** (2026-11-19, Omar: "I like each of the features… I want all of
+  these switches"). See "Clipboard features (2026-11-19)".
+- [x] **M9 — Dictation, fn key** (2026-11-19, Omar chose fn; "ignore French, I don't speak
+  French"). See "Dictation (2026-11-19)". Needs Omar's own voice, with Wispr Flow quit.
 
 ## How to build and test
 - `./run.sh` builds, signs, installs to `~/Applications/ClipDock.app`, and relaunches.
@@ -371,6 +373,64 @@
     Mac has been idle since that keypress, not for 20 s.
 - **The language card was offered once more** (`didShowLanguageCard.french`), because the
   French files were new. It asks only for missing pairs; English and Russian were installed.
+
+## Clipboard features (2026-11-19)
+- **Omar asked** for every feature suggested (quick wins 1–7, bigger 8–10) with a switch each.
+  Settings now has four tabs; each new behaviour has a switch, on by default
+  (`AppSettings.Switch`).
+- **⌃⌃ with nothing selected** translates the clipboard (`copiedText()` skips concealed types).
+  The card says "from clipboard" and its button is Paste.
+- **Reply in their language:** `ReplyLanguageMemory` (Core) remembers the last French/Russian
+  source for an hour; every translation path (card, popup ⌘T, voice) goes through
+  `TranslationService.translate(_:direction:)`, which notes it. Settings' "Translate English
+  into" stays the default.
+- **Clean links:** `LinkCleaner` (Core): `utm_*`, `pk_*`, `mtm_*`, `hsa_*`, click ids (`fbclid`,
+  `gclid`, `msclkid` …), and per-site ones (`si` on YouTube/Spotify, `igsh` on Instagram, `s`/`t`
+  on X). The clipboard is rewritten only when the copy is a plain link (no HTML/RTF/image).
+- **Sensitive copies:** `SensitiveDetector` (Core) — whole-copy only: known key prefixes,
+  `NAME=value` with KEY/TOKEN/SECRET/PASSWORD in the name, JWTs, private keys, Luhn-valid card
+  numbers, mod-97 IBANs, 6–8 digit codes. Migration `v4-expiry-and-dictation` adds `expiresAt` and
+  `isDictation`. `RetentionPolicy` removes due rows; `HistoryMaintenance` checks every 15 s in
+  memory. ⌘P (and saving as a named item) clears the expiry.
+- **Actions menu:** groups with dividers (`ClipAction.group`), and it scrolls when taller than the
+  card. Writing actions appear only when Apple Intelligence is available and the switch is on.
+  Contact actions come from `ContactDetector` (NSDataDetector). WhatsApp opens
+  `whatsapp://send?phone=` (wa.me if the app is missing); Call uses `tel:`; Add to Calendar opens a
+  one-event .ics in Calendar's own "add" window (file in ClipDock's folder, deleted after a
+  minute) — ClipDock never writes to calendars itself.
+- **Image tools** (`ImageTools`, `ImageActions`): Vision `RecognizeTextRequest` (en/ru/fr),
+  1,600 px JPEG+PNG for Paste Smaller, JPEG (also as a file in `exports/`, removed after a day)
+  for Copy as JPEG, `GenerateForegroundInstanceMaskRequest` for Remove Background. Work on copied
+  images and on copied image files (HEIC). New images go into history.
+- **Writing actions** (`WritingAssistant`): `SystemLanguageModel(useCase: .general, guardrails:
+  .permissiveContentTransformations)`, temperature 0.2, a fresh session per request (prewarmed).
+  Probe: ~0.5 s per request once warm, ~4 s the first time. Russian isn't officially supported;
+  it works partly.
+- **Quick Look** (⇧Space with an empty search, ⌘Y): `PeekView` replaces the list; ↑↓ move.
+- **Paste stack** (⇧⌘↩ on marked items): `PasteStackController` pastes the first, then a global
+  ⌘V monitor (key code 9) moves to the next 300 ms after each paste; the clipboard is restored at
+  the end. Copying something else stops it (and keeps the new copy); "Stop Paste Stack" in the
+  menu; 10-minute idle timeout.
+
+## Dictation (2026-11-19)
+- **Decisions:** fn key (Omar). Apple engines only. English + Russian (no French). On-device
+  clean-up only (Claude not used). ClipDock's dictation is off while Wispr Flow runs (checked by
+  bundle id prefix `com.electron.wispr-flow`), so nothing is typed twice.
+- **Probes on this Mac:** two `SpeechTranscriber`s in one analyzer work; for synthesized speech
+  EN conf 0.83 vs a wrong-language FR 0.80 (so the alphabet and amount of text matter too, see
+  `TranscriptPicker`). Russian via `DictationTranscriber` was "supported, not installed"; Apple's
+  download took 134 s. Russian alone: 0.86 s; EN+RU together: 0.6–2.7 s for a 5 s clip.
+- **Pieces:** `FnKeyMonitor` → `HoldToTalkDetector` (Core: 0.3 s hold threshold, 0.4 s double-tap
+  gap, other keys cancel, ⌃ = command, ⇧ = translate, ⌘/⌥ cancel) → `DictationController`.
+  `AudioCapture` (AVAudioEngine tap → AVAudioConverter, queued until the recogniser's format is
+  known, so nothing is lost on the first use) → `SpeechSession` (model retention: process
+  lifetime; prewarmed 3 s after launch once the microphone is allowed) → `DictationCleanup` →
+  polish → `TextInserter` (clipboard + ⌘V + restore) → history with `isDictation`.
+- **Pill:** bottom centre of the screen with the mouse (like Wispr), level meter, live text,
+  mode chip.
+- **Settings → Dictation:** language, filler rules, polish, voice commands, personal dictionary,
+  and status rows for the microphone, English/Russian speech (Download… for Russian), the fn key
+  ("Press 🌐 key to" — read only; on this Mac it's "Start Dictation"), and Wispr Flow.
 
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by

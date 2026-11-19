@@ -22,6 +22,8 @@ final class TranslationService {
     private let card: TranslationCardController
     private let hooks: Hooks
     private var isBusy = false
+    /// "Reply in their language": the last foreign language translated, for an hour.
+    private var reply = ReplyLanguageMemory()
 
     init(translator: any Translator, hud: HUDController, capture: CaptureController, card: TranslationCardController, hooks: Hooks) {
         self.translator = translator
@@ -49,14 +51,41 @@ final class TranslationService {
 
     /// For ⌘T in the popup. The row shows progress, so there's no HUD.
     func translate(_ text: String) async throws -> String {
-        let direction = Self.direction(for: text)
+        let direction = direction(for: text)
         Log.translate.notice("row direction=\(direction.id, privacy: .public) chars=\(text.count, privacy: .public)")
-        return try await translator.translate(text, direction: direction)
+        return try await translate(text, direction: direction)
     }
 
-    /// French and Russian go into English; English goes into the language picked in Settings.
-    static func direction(for text: String) -> TranslationDirection {
-        LanguageDetector.direction(for: text, englishTarget: AppSettings.englishTarget)
+    /// Into a language Omar named ("translate to Russian"). Text already in it comes back as is.
+    func translate(_ text: String, into target: TranslationLanguage) async throws -> String {
+        let source = LanguageDetector.language(of: text)
+        guard source != target else { return text }
+        guard source == .english || target == .english else {
+            // Apple translates through English for French ↔ Russian.
+            let english = try await translate(text, direction: TranslationDirection(source, to: .english))
+            return try await translate(english, direction: TranslationDirection(.english, to: target))
+        }
+        return try await translate(text, direction: TranslationDirection(source, to: target))
+    }
+
+    /// French and Russian go into English. English goes into the conversation's language when
+    /// "Reply in their language" remembers one, otherwise into the language picked in Settings.
+    func direction(for text: String) -> TranslationDirection {
+        LanguageDetector.direction(for: text, englishTarget: englishTarget)
+    }
+
+    /// Where English goes right now.
+    var englishTarget: TranslationLanguage {
+        let fallback = AppSettings.englishTarget
+        guard AppSettings.isOn(.replyInTheirLanguage) else { return fallback }
+        return reply.englishTarget(default: fallback, now: .now)
+    }
+
+    /// Every translation goes through here, so the reply language follows the conversation.
+    private func translate(_ text: String, direction: TranslationDirection) async throws -> String {
+        let result = try await translator.translate(text, direction: direction)
+        reply.noteTranslation(from: direction.source, at: .now)
+        return result
     }
 
     /// Adds a translation to history with the "translated" badge.
@@ -90,17 +119,27 @@ final class TranslationService {
         if grabbed != .nothingCopied { snapshot.restore() }  // the temporary ⌘C copy is never kept
         capture.endIgnoringChanges()
 
-        guard case .text(let selection) = grabbed else {
-            hud.show("Select some text first", style: .error)
+        // Nothing selected (WhatsApp messages can't be selected): translate what was just copied.
+        let fromClipboard = grabbed == .nothingCopied && AppSettings.isOn(.translateClipboard)
+        let text: String
+        if case .text(let selection) = grabbed {
+            text = selection
+        } else if fromClipboard, let copied = Self.copiedText() {
+            text = copied
+        } else {
+            hud.show(fromClipboard ? "Select or copy some text first" : "Select some text first", style: .error)
             Log.translate.notice("stopped reason=\(grabbed == .nothingCopied ? "nothingCopied" : "notText", privacy: .public)")
             return
         }
-        let direction = Self.direction(for: selection)
+        let direction = direction(for: text)
+        let isReply = direction.source == .english && direction.target != AppSettings.englishTarget
         do {
-            let translation = try await translateShowingProgress(selection, direction: direction)
+            let translation = try await translateShowingProgress(text, direction: direction)
             card.show(
                 translation: translation,
                 direction: direction,
+                note: [fromClipboard ? "from clipboard" : nil, isReply ? "reply" : nil].compactMap { $0 }.joined(separator: " · "),
+                primaryTitle: fromClipboard ? "Paste" : "Replace",
                 onReplace: { [weak self] in self?.replaceSelection(with: translation, in: target) },
                 onCopy: { [weak self] in
                     PasteboardWriter.write(text: translation)
@@ -109,8 +148,8 @@ final class TranslationService {
                 }
             )
             Log.translate.notice("""
-                card direction=\(direction.id, privacy: .public) \
-                chars=\(selection.count, privacy: .public)->\(translation.count, privacy: .public)
+                card direction=\(direction.id, privacy: .public) clipboard=\(fromClipboard, privacy: .public) \
+                reply=\(isReply, privacy: .public) chars=\(text.count, privacy: .public)->\(translation.count, privacy: .public)
                 """)
         } catch {
             hud.show(describe(error), style: .error)
@@ -155,7 +194,19 @@ final class TranslationService {
             progress.cancel()
             hud.hide()
         }
-        return try await translator.translate(text, direction: direction)
+        return try await translate(text, direction: direction)
+    }
+
+    /// The clipboard's text, unless it's a password or a secret (concealed) or too big.
+    private static func copiedText() -> String? {
+        let pasteboard = NSPasteboard.general
+        let types = Set((pasteboard.types ?? []).map(\.rawValue))
+        guard types.isDisjoint(with: SkipRules.concealedTypes),
+              let text = pasteboard.string(forType: .string),
+              !text.allSatisfy(\.isWhitespace), text.utf8.count <= 200_000
+        else { return nil }
+        if case .url = ClipPayload.fromText(text, rtf: nil) { return nil }  // a link isn't for translating
+        return text
     }
 
     /// ⌘C needs Accessibility, and secure input blocks it.

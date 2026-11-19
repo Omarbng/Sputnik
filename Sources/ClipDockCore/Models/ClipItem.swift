@@ -22,6 +22,11 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
     public var name: String?
     /// For secrets: the Keychain account that holds the value.
     public var secretRef: String?
+    /// A sensitive copy (a key, card number, one-time code …) leaves history at this time,
+    /// unless it's saved first. Nil for everything else.
+    public var expiresAt: Date?
+    /// Text ClipDock typed for Omar's voice (shown with a "dictated" badge).
+    public var isDictation: Bool
 
     public init(
         id: Int64? = nil,
@@ -38,7 +43,9 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         isPinned: Bool = false,
         isTranslation: Bool = false,
         name: String? = nil,
-        secretRef: String? = nil
+        secretRef: String? = nil,
+        expiresAt: Date? = nil,
+        isDictation: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -55,6 +62,8 @@ public struct ClipItem: Codable, Sendable, Equatable, Identifiable {
         self.isTranslation = isTranslation
         self.name = name
         self.secretRef = secretRef
+        self.expiresAt = expiresAt
+        self.isDictation = isDictation
     }
 
     public var isSecret: Bool { kind == .secret }
@@ -102,6 +111,7 @@ extension ClipItem: FetchableRecord, MutablePersistableRecord {
         public static let lastUsedAt = Column(CodingKeys.lastUsedAt)
         public static let isPinned = Column(CodingKeys.isPinned)
         public static let kind = Column(CodingKeys.kind)
+        public static let expiresAt = Column(CodingKeys.expiresAt)
     }
 
     public mutating func didInsert(_ inserted: InsertionSuccess) {

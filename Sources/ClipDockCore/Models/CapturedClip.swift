@@ -8,19 +8,27 @@ public struct CapturedClip: Sendable, Equatable {
     public var capturedAt: Date
     /// A translation ClipDock made, rather than something the user copied.
     public var isTranslation: Bool
+    /// Dictated text ClipDock typed for Omar.
+    public var isDictation: Bool
+    /// When a sensitive copy leaves history (see `SensitiveDetector`), or nil to keep it.
+    public var expiresAt: Date?
 
     public init(
         payload: ClipPayload,
         sourceBundleID: String?,
         sourceAppName: String?,
         capturedAt: Date,
-        isTranslation: Bool = false
+        isTranslation: Bool = false,
+        isDictation: Bool = false,
+        expiresAt: Date? = nil
     ) {
         self.payload = payload
         self.sourceBundleID = sourceBundleID
         self.sourceAppName = sourceAppName
         self.capturedAt = capturedAt
         self.isTranslation = isTranslation
+        self.isDictation = isDictation
+        self.expiresAt = expiresAt
     }
 
     public var kind: ClipKind {

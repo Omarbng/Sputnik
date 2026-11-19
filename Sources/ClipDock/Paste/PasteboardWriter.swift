@@ -34,7 +34,9 @@ enum PasteboardWriter {
         return write([item], to: pasteboard)
     }
 
-    private static func write(_ items: [NSPasteboardItem], to pasteboard: NSPasteboard) -> Bool {
+    /// Writes prepared items (several types at once, such as JPEG plus a file).
+    @discardableResult
+    static func write(_ items: [NSPasteboardItem], to pasteboard: NSPasteboard = .general) -> Bool {
         for item in items {
             item.setData(Data(), forType: internalType)
         }

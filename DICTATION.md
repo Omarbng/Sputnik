@@ -1,7 +1,16 @@
 # Own dictation ("ClipDock Voice") — plan (M7 write-up, 2026-11-19)
 
 Omar wants his own Wispr Flow. This is the write-up M7 asked for: what it would take, how
-good it can be, and what it can and can't match. **Nothing is built yet.**
+good it can be, and what it can and can't match.
+
+**Update 2026-11-19 (built, see CLAUDE.md 4.11 and PROGRESS.md "Dictation"):** Omar said "go
+ahead", chose the **fn** key, and later said **"ignore French, I don't speak French"**. Built with
+Apple's engines only (no new dependency): English via `SpeechTranscriber`, Russian via
+`DictationTranscriber` (Apple's Russian model downloaded, about 2 minutes), both listening and
+the better reading kept. Clean-up: rules (EN/RU) plus Apple Intelligence polish for English.
+Claude isn't used (M6 undecided). Wispr Flow must be quit (or moved off fn) — ClipDock's
+dictation stays off while it runs, so text is never typed twice. D1, D3 and D4 are built; the D2
+bake-off (Omar's own voice vs Parakeet) is still open.
 
 ## What Wispr Flow does (checked on wisprflow.ai, 2026-11-19)
 - Hold a key (Fn), speak, release: the text appears in any app. Hands-free mode too.

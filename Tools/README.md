@@ -8,6 +8,12 @@
 - `clip-save.js` / `clip-restore.js`: save and restore the whole clipboard (every item and type) around a
   test, with `osascript -l JavaScript Tools/clip-save.js /path/file.json`.
 
+Hooks added 2026-11-19 (see `DebugHooks.swift`): `dictateFile` (a dictation from an audio file, no
+microphone; make test audio with `say -o x.wav --data-format=LEI16@16000`), `fn` (feeds the fn monitor
+directly — never post real fn events: macOS and Wispr Flow would react), `pillSnapshot`, `stack`
+(paste stack), `historyFlags` (badges and expiry by id). The scripted run of every new feature is
+`feat-burst.sh`/`feat-waiter.sh` in the session scratchpad (copied into PROGRESS.md's results).
+
 Before a test sends ⌘V, it must check that the intended app is frontmost. Otherwise the paste lands in
 whatever you're using at that moment.
 

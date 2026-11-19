@@ -14,6 +14,7 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     let actions: ItemActions
     let saved: SavedItems
     let translation: TranslationService
+    let tools: PopupTools
     private var keyMonitor: Any?
     private var rightClickMonitor: Any?
     private var clickMonitor: Any?
@@ -34,18 +35,19 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
     init(
         history: HistoryModel, icons: AppIconCache, thumbnails: ThumbnailCache,
-        actions: ItemActions, saved: SavedItems, translation: TranslationService
+        actions: ItemActions, saved: SavedItems, translation: TranslationService, tools: PopupTools
     ) {
         let model = PopupViewModel(history: history)
         self.model = model
         self.actions = actions
         self.saved = saved
         self.translation = translation
+        self.tools = tools
         super.init()
 
         let root = PopupRootView(
             model: model, icons: icons, thumbnails: thumbnails, searchField: searchField,
-            editorFields: editorFields,
+            editorFields: editorFields, peekImage: { [tools] item in tools.images.imageData(for: item) },
             onDock: { [weak self] item in self?.handleDock(item) }
         )
         let hosting = NSHostingView(rootView: root)
@@ -145,6 +147,7 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         guard (obj.object as? NSTextField) === searchField else { return }
         model.isCollapsed = false
         model.actionMenu = nil
+        model.peekID = nil  // typing goes back to the list
         model.query = searchField.stringValue
     }
 
@@ -183,6 +186,10 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func handleKey(_ event: NSEvent) -> Bool {
         guard event.window === panel else { return false }
         let modifiers = PopupKeymap.Modifiers(event.modifierFlags)
+        // With text in the search box, Space and ⇧Space type a space (multi-word search).
+        if model.editor == nil, event.keyCode == 0x31, !model.query.isEmpty, !modifiers.contains(.command) {
+            return false
+        }
         if model.editor != nil {
             guard let command = EditorKeymap.command(keyCode: event.keyCode, modifiers: modifiers) else { return false }
             handleEditor(command)
@@ -206,6 +213,7 @@ final class PopupController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     /// Runs a key's command. Returns false when the key should go to the search field instead.
     func handle(_ command: PopupCommand) -> Bool {
         if model.actionMenu != nil { return handleInMenu(command) }
+        if model.peekID != nil, handleInPeek(command) { return true }
         // Space marks items only while the search box is empty; otherwise it types a space,
         // so multi-word searches work (Omar's choice, 2026-11-10).
         if command == .toggleMark, !model.query.isEmpty { return false }

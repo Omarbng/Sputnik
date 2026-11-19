@@ -15,6 +15,9 @@ struct ActionMenuView: View {
 
     @Namespace private var highlight
 
+    /// Taller menus (text with a phone number and the writing actions) scroll inside the card.
+    static let maxHeight: CGFloat = PopupLayout.cardHeight - PopupLayout.searchHeight - 16
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(item.displayTitle.isEmpty ? "(blank)" : item.displayTitle)
@@ -23,11 +26,20 @@ struct ActionMenuView: View {
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .frame(height: 22, alignment: .leading)
-            ForEach(Array(menu.actions.enumerated()), id: \.element) { index, action in
-                if action.startsGroup, index > 0 {
-                    Rectangle().fill(tokens.border).frame(height: 1).padding(.vertical, 2)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(menu.actions.enumerated()), id: \.element) { index, action in
+                            if index > 0, menu.actions[index - 1].group != action.group {
+                                Rectangle().fill(tokens.border).frame(height: 1).padding(.vertical, 2)
+                            }
+                            row(action, index: index).id(index)
+                        }
+                    }
                 }
-                row(action, index: index)
+                .scrollIndicators(.never)
+                .frame(maxHeight: Self.listHeight(for: menu.actions))
+                .onChange(of: menu.highlighted) { _, index in proxy.scrollTo(index) }
             }
         }
         .padding(.vertical, 4)
@@ -35,6 +47,13 @@ struct ActionMenuView: View {
         .frame(width: Self.width)
         .animation(Motion.slide(Motion.reduceMotion), value: menu.highlighted)
         .background(MaterialBackground(cornerRadius: 12))
+    }
+
+    /// The rows' natural height, capped so the menu fits in the card.
+    static func listHeight(for actions: [ClipAction]) -> CGFloat {
+        let dividers = zip(actions, actions.dropFirst()).filter { $0.group != $1.group }.count
+        let natural = CGFloat(actions.count) * rowHeight + CGFloat(dividers) * 5
+        return min(natural, maxHeight - 30)
     }
 
     private func row(_ action: ClipAction, index: Int) -> some View {

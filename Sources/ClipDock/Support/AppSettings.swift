@@ -20,6 +20,86 @@ enum AppSettings {
         static let popupTap = "popupDoubleTap"
         static let translateTap = "translateDoubleTap"
         static let didMigrateToDoubleTaps = "didMigrateToDoubleTaps"
+        // Switches added 2026-11-19 (all on by default).
+        static let translateClipboard = "translateClipboardWhenNothingSelected"
+        static let replyInTheirLanguage = "replyInTheirLanguage"
+        static let cleanLinks = "cleanTrackingFromLinks"
+        static let expireSensitive = "forgetSensitiveCopies"
+        static let writingTools = "writingActions"
+        static let dictation = "dictationHoldFn"
+        static let dictationLanguage = "dictationLanguage"
+        static let dictationRules = "dictationRemoveFillers"
+        static let dictationPolish = "dictationPolishWithAppleIntelligence"
+        static let voiceCommands = "dictationVoiceCommands"
+        static let dictationVocabulary = "dictationVocabulary"
+    }
+
+    /// The on/off switches in Settings. Each is on unless Omar turns it off.
+    enum Switch: String, CaseIterable {
+        /// ⌃⌃ with nothing selected translates what's on the clipboard.
+        case translateClipboard
+        /// After translating French or Russian, English goes back into that language for an hour.
+        case replyInTheirLanguage
+        /// Copied links lose `utm_…`, `fbclid` and the like.
+        case cleanLinks
+        /// Keys, card numbers, IBANs and one-time codes leave history after 10 minutes.
+        case expireSensitive
+        /// Proofread, Make Professional, Shorter, Summarize in ⌘K (Apple Intelligence).
+        case writingTools
+        /// Hold fn to dictate.
+        case dictation
+        /// Remove "um", "uh" / "эм" and turn "new line" into a line break.
+        case dictationRules
+        /// Polish dictation (English and Russian) with Apple Intelligence.
+        case dictationPolish
+        /// fn+⌃ commands, and "insert <saved item>" while dictating.
+        case voiceCommands
+
+        var key: String {
+            switch self {
+            case .translateClipboard: Key.translateClipboard
+            case .replyInTheirLanguage: Key.replyInTheirLanguage
+            case .cleanLinks: Key.cleanLinks
+            case .expireSensitive: Key.expireSensitive
+            case .writingTools: Key.writingTools
+            case .dictation: Key.dictation
+            case .dictationRules: Key.dictationRules
+            case .dictationPolish: Key.dictationPolish
+            case .voiceCommands: Key.voiceCommands
+            }
+        }
+    }
+
+    static func isOn(_ setting: Switch) -> Bool {
+        defaults.object(forKey: setting.key) as? Bool ?? true
+    }
+
+    static func set(_ setting: Switch, _ on: Bool) {
+        defaults.set(on, forKey: setting.key)
+    }
+
+    /// Which language dictation listens for: both (it picks), or just one (faster, surer).
+    enum DictationLanguage: String, CaseIterable {
+        case automatic, english, russian
+
+        var label: String {
+            switch self {
+            case .automatic: "English or Russian (automatic)"
+            case .english: "English only"
+            case .russian: "Russian only"
+            }
+        }
+    }
+
+    static var dictationLanguage: DictationLanguage {
+        get { defaults.string(forKey: Key.dictationLanguage).flatMap(DictationLanguage.init(rawValue:)) ?? .automatic }
+        set { defaults.set(newValue.rawValue, forKey: Key.dictationLanguage) }
+    }
+
+    /// Names and words the recogniser should expect (the personal dictionary), one per line.
+    static var dictationVocabulary: [String] {
+        get { defaults.stringArray(forKey: Key.dictationVocabulary) ?? [] }
+        set { defaults.set(newValue, forKey: Key.dictationVocabulary) }
     }
 
     /// The modifier to double-tap to open the clipboard (default ⌥), or nil for off.

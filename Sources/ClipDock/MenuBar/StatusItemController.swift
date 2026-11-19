@@ -18,6 +18,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         var allowCapture: () -> Void
         var allowPasting: () -> Void
         var downloadLanguages: () -> Void
+        /// "2 of 3" while a paste stack is waiting for ⌘V, else nil.
+        var pasteStackProgress: () -> String?
+        var stopPasteStack: () -> Void
     }
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -48,6 +51,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         addSetupItems(to: menu)
+        if let progress = actions.pasteStackProgress() {
+            let stop = item("Stop Paste Stack", #selector(stopPasteStack))
+            stop.subtitle = "\(progress) on the clipboard — each ⌘V pastes the next"
+            menu.addItem(stop)
+            menu.addItem(.separator())
+        }
 
         let open = item("Open ClipDock", #selector(openPopup))
         open.setShortcut(for: .openPopup)
@@ -126,4 +135,5 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func allowCapture() { actions.allowCapture() }
     @objc private func allowPasting() { actions.allowPasting() }
     @objc private func downloadLanguages() { actions.downloadLanguages() }
+    @objc private func stopPasteStack() { actions.stopPasteStack() }
 }

@@ -58,6 +58,9 @@ public final class HistoryDatabase: Sendable {
                 existing.sourceBundleID = clip.sourceBundleID ?? existing.sourceBundleID
                 existing.sourceAppName = clip.sourceAppName ?? existing.sourceAppName
                 existing.isTranslation = existing.isTranslation || clip.isTranslation
+                existing.isDictation = existing.isDictation || clip.isDictation
+                // Copying a sensitive value again restarts its countdown; saved items never expire.
+                existing.expiresAt = existing.isPinned ? nil : clip.expiresAt
                 try existing.update(db)
                 item = existing
                 wasDuplicate = true
@@ -73,7 +76,9 @@ public final class HistoryDatabase: Sendable {
                     byteSize: clip.byteSize,
                     createdAt: now,
                     lastUsedAt: now,
-                    isTranslation: clip.isTranslation
+                    isTranslation: clip.isTranslation,
+                    expiresAt: clip.expiresAt,
+                    isDictation: clip.isDictation
                 )
                 try new.insert(db)
                 item = new
@@ -110,6 +115,7 @@ public final class HistoryDatabase: Sendable {
         try queue.write { db in
             guard var item = try ClipItem.fetchOne(db, key: id) else { return nil }
             item.isPinned = pinned
+            if pinned { item.expiresAt = nil }  // saving a sensitive copy keeps it
             try item.update(db)
             return item
         }
@@ -187,6 +193,12 @@ public final class HistoryDatabase: Sendable {
             try db.alter(table: ClipItem.databaseTableName) { t in
                 t.add(column: "name", .text)
                 t.add(column: "secretRef", .text)
+            }
+        }
+        migrator.registerMigration("v4-expiry-and-dictation") { db in
+            try db.alter(table: ClipItem.databaseTableName) { t in
+                t.add(column: "expiresAt", .datetime)
+                t.add(column: "isDictation", .boolean).notNull().defaults(to: false)
             }
         }
         return migrator

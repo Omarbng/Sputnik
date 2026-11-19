@@ -38,10 +38,11 @@ struct PopupKeymapTests {
         #expect(command(0x09, .command) == .pasteText)
     }
 
-    @Test("Space toggles the multi-select mark")
+    @Test("Space toggles the multi-select mark; ⇧Space is Quick Look")
     func space() {
         #expect(command(0x31) == .toggleMark)
-        #expect(command(0x31, .shift) == nil)
+        #expect(command(0x31, .shift) == .peek)
+        #expect(command(0x31, .option) == nil)
     }
 
     @Test("Typing and other combinations go to the search field")

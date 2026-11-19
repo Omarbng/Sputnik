@@ -17,6 +17,7 @@ extension HistoryDatabase {
         return try queue.write { db in
             if var existing = try ClipItem.filter(ClipItem.Columns.contentHash == clip.contentHash).fetchOne(db) {
                 existing.isPinned = true
+                existing.expiresAt = nil
                 existing.name = name ?? existing.name
                 existing.lastUsedAt = now
                 try existing.update(db)

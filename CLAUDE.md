@@ -1,6 +1,6 @@
 # ClipDock — build brief
 
-A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). It's a personal tool, so it isn't for the App Store or for sharing.
+A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). Since 2026-11-19 it also does on-device dictation (hold fn, English and Russian), image text, and Apple Intelligence writing actions. It's a personal tool, so it isn't for the App Store or for sharing.
 
 **What matters most**
 
@@ -38,6 +38,8 @@ A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has
 | Translation | Apple's **Translation** framework, which runs on the device. Claude API mode is optional and comes in M6. |
 | Language detection | If more than 30% of the letters are Cyrillic, the text is Russian. Otherwise `NLLanguageRecognizer`, limited to English, French and Russian, decides; French needs 60%+ confidence. Anything else counts as English. |
 | Bundle id | `com.omar.clipdock`. Omar can change this. |
+| Dictation (2026-11-19) | Apple's on-device recognisers: `SpeechTranscriber` for English, `DictationTranscriber` for Russian (the new model has no Russian). Both listen; `TranscriptPicker` keeps the one that understood. No French dictation (Omar doesn't speak it). Parakeet/Whisper not added (no new dependency). |
+| Writing and images (2026-11-19) | Apple Intelligence (`FoundationModels`, on device) for rewrites and dictation polish; Vision for text in images and background removal. |
 
 ---
 
@@ -52,6 +54,7 @@ combos (such as ⌘⇧V) can still be recorded there.
 | Open popup at cursor | tap ⌥ twice | |
 | Translate selected text | tap ⌃ twice | A card shows the translation: ↩ replaces the selection, ⌘C copies, Esc closes. This replaces the old ⌥⌘T and ⇧⌥⌘T. |
 | Translate with the other engine | (M6, to be decided) | Uses Claude if the default is Apple, or Apple if the default is Claude. |
+| Dictate | hold fn | Added 2026-11-19 (Omar chose fn). Double-tap fn = hands-free (fn again finishes, Esc cancels). fn + ⌃ = voice command on the selection; fn + ⇧ = type it translated. |
 
 **Inside the popup**
 
@@ -74,6 +77,8 @@ combos (such as ⌘⇧V) can still be recorded there.
 | ⌘V in the Secrets tab | Save what you copied as a secret (with an empty search) (added 2026-11-11) |
 | ⌘N | Type in a new saved item (in the Secrets tab, a new secret; the name is optional) (added 2026-11-11) |
 | ⌘C | Copy without pasting |
+| ⇧Space (empty search) or ⌘Y | Quick Look: the whole text or image (added 2026-11-19) |
+| ⇧⌘↩ | Paste the marked items one by one: each ⌘V in any app pastes the next (added 2026-11-19) |
 | ⌘⌫ | Delete the item. A saved item asks first: press ⌘⌫ again. |
 | ⌘, | Open Settings |
 | Esc | Close (or close the actions menu or editor) |
@@ -151,6 +156,10 @@ combos (such as ⌘⇧V) can still be recorded there.
 7. Add the translation to history with a "translated" badge. Don't store the temporary ⌘C copy.
 8. Omar can undo with ⌘Z in the target app as usual.
 
+**Added 2026-11-19 (Omar), each with a switch in Settings:**
+- **Nothing selected:** ⌃⌃ translates what's on the clipboard (not concealed items); the card says "from clipboard" and ↩ pastes at the cursor.
+- **Reply in their language:** after a French or Russian → English translation, English goes into that language for an hour (`ReplyLanguageMemory`); the card says "reply".
+
 **Show only (⇧⌥⌘T):** run steps 1–3, then show the translation in a small card at the cursor. The card has a Copy button and Esc closes it. Use this for text that can't be edited, such as web pages and PDFs.
 
 **From the popup (⌘T):** the translation appears under the selected row. ↩ pastes the translation and ⌘C copies it.
@@ -188,6 +197,8 @@ Keep it small, with these settings:
 - translation engine, API key, and model id
 - launch at login
 - **permission status:** Accessibility and Paste from Other Apps, each with an "Open Settings" button
+- **Changed 2026-11-19:** four tabs (General, Clipboard, Translation, Dictation), with an on/off
+  switch for every feature in 4.4 (added part), 4.9 (writing actions), 4.10 and 4.11, plus microphone status
 
 ### 4.8 Saved items and secrets (added 2026-11-11, Omar)
 - The Pinned tab is now **Saved**. It holds pinned clips (⌘P) and text Omar types in with ⌘N
@@ -218,10 +229,31 @@ Keep it small, with these settings:
     squeezes spaces, keeping paragraphs). The cleaned-up text is added to history.
   - Delete (⌘⌫)
 - In the menu, ↑↓ move, ↩ runs, and Esc closes only the menu.
+- **Added 2026-11-19 (Omar):** Quick Look; Apple Intelligence writing actions (Proofread, Make
+  Professional, Make Shorter, Summarize; result under the row, ↩ pastes); Message on WhatsApp,
+  Call, Write Email, Add to Calendar… when the text has a number, address or date; for images and
+  image files: Copy Text in Image, Translate Text in Image (⌘T), Paste Smaller Image, Copy as
+  JPEG, Remove Background. Long menus scroll.
+
+### 4.10 Clipboard automation (added 2026-11-19, Omar; switches in Settings, on by default)
+- **Clean links:** a copied lone link loses tracking parameters (`LinkCleaner`), in history and on
+  the clipboard (not when the copy also has HTML, RTF or an image).
+- **Sensitive copies:** keys, tokens, card numbers (Luhn), IBANs (mod 97) and 6–8 digit codes get
+  `expiresAt` = 10 minutes; retention removes them, ⌘P keeps one. Rows show ⏱.
+
+### 4.11 Dictation (added 2026-11-19, Omar; see DICTATION.md)
+- Hold fn → listen (audio in memory only) → recognise → clean-up rules → optional Apple
+  Intelligence polish (English) → typed via clipboard + ⌘V + restore → history row "dictated".
+- Any other key while holding cancels, so fn shortcuts still work. Off while Wispr Flow runs.
+- Voice commands: "insert <saved item name>"; fn + ⌃ on a selection: translate to …, proofread,
+  shorter, professional, summarize, or any instruction (Apple Intelligence).
+- Settings: language (automatic / English / Russian), filler rules, polish, commands, personal
+  dictionary (`contextualStrings`), status of microphone, languages, the fn key and Wispr Flow.
 
 ### 4.7 Privacy rules
 - All data stays local, and the app makes no network calls except in Claude mode.
 - **Never log clipboard contents.** Logs may contain only ids, types, and sizes.
+- **Dictation:** audio never touches disk; logs hold durations, word counts, languages and modes, never what was said.
 
 ---
 
@@ -386,6 +418,21 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 
 ---
 
+### M8 — Clipboard features (added 2026-11-19, Omar)
+- ⌃⌃ on the clipboard, reply in their language, clean links, sensitive copies, Quick Look, contact
+  actions, image tools, writing actions, paste stack, and a Settings switch for each.
+
+**Done when:**
+- [ ] Each works in the test window (scripted run) and unit tests cover the pure logic.
+- [ ] Omar tries them in WhatsApp, Chrome and Finder.
+
+### M9 — Dictation (added 2026-11-19, Omar: fn key, Apple engines)
+- Hold fn, hands-free, fn + ⌃ commands, fn + ⇧ translation, snippets, clean-up, polish, pill.
+
+**Done when:**
+- [ ] English and Russian recordings are typed correctly in the test window (scripted, from files).
+- [ ] Omar dictates with his own voice in Chrome, WhatsApp and Cursor, with Wispr Flow quit.
+
 ## 7. Testing
 - **Unit tests** (Swift Testing) for the pure logic: dedupe, skip rules, retention, language detection, text splitting, and positioning math.
 - **Manual checks:** the "Done when" lists above.
@@ -408,4 +455,5 @@ These are approximately shadcn's "neutral" dark theme, which the reference uses.
 ---
 
 ## 9. Out of scope
-iCloud sync, other devices, the App Store, notarization, auto-update, OCR, and any AI features beyond translation.
+iCloud sync, other devices, the App Store, notarization, auto-update, and cloud AI (except the optional Claude translation).
+**Changed 2026-11-19 (Omar):** OCR (text in images) and on-device AI features (writing actions, dictation) are now in scope.

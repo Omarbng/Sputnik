@@ -13,7 +13,7 @@ extension PopupController {
             model.moveSelection(by: 1)
         case .pasteSelected:
             if let text = model.selectedTranslation {
-                actions.pasteTranslation(text, closePopup: { close(.picked) })
+                pasteResult(text)
             } else if let item = model.selectedItem {
                 paste(item)
             }
@@ -24,7 +24,7 @@ extension PopupController {
             if let item = model.item(at: number - 1) { paste(item) }
         case .copySelected:
             if let text = model.selectedTranslation {
-                actions.copyTranslation(text, closePopup: { close(.picked) })
+                copyResult(text)
             } else if let item = model.selectedItem {
                 actions.copy(item, closePopup: { close(.picked) })
             }
@@ -64,6 +64,10 @@ extension PopupController {
             model.scope = model.scope.previous
         case .saveAsSecret:
             if let item = model.selectedItem { run(.saveAsSecret, on: item) }
+        case .peek:
+            togglePeek()
+        case .pasteOneByOne:
+            startPasteStack()
         case .selectAllText:
             searchField.currentEditor()?.selectAll(nil)
         case .cutText:
@@ -108,13 +112,14 @@ extension PopupController {
         model.select(item)
         model.pendingDeleteID = nil
         model.isCollapsed = false
-        model.actionMenu = ActionMenuState(itemID: id, actions: ClipAction.available(for: item))
+        model.peekID = nil
+        model.actionMenu = ActionMenuState(itemID: id, actions: availableActions(for: item))
     }
 
     /// Runs an action on an item, from the menu, a shortcut, or a button.
     func run(_ action: ClipAction, on item: ClipItem) {
         model.actionMenu = nil
-        guard ClipAction.available(for: item).contains(action) else {
+        guard availableActions(for: item).contains(action) else {
             actions.notify(Self.unavailableMessage(action, item))
             return
         }
@@ -141,6 +146,14 @@ extension PopupController {
             pasteCleaned(item, action)
         case .delete:
             requestDelete(item)
+        case .peek:
+            model.peekID = item.id
+        case .proofread, .professional, .shorter, .summarize:
+            if let style = action.rewriteStyle { rewriteSelected(item, style: style) }
+        case .whatsApp, .call, .email, .addToCalendar:
+            runContactAction(action, on: item)
+        case .copyText, .pasteSmaller, .copyAsJPEG, .removeBackground:
+            runImageAction(action, on: item)
         }
     }
 
@@ -161,26 +174,6 @@ extension PopupController {
 
     func paste(_ item: ClipItem) {
         actions.paste(item, closePopup: { close(.picked) })
-    }
-
-    /// ⌘T: translate the selected row and show the result under it.
-    func translateSelected() {
-        guard let item = model.selectedItem, let id = item.id else { return }
-        guard model.translation?.itemID != id else { return }  // already shown or in progress
-        guard item.kind == .text || item.kind == .url, let text = item.text else {
-            model.translation = RowTranslation(itemID: id, state: .failed("Only text can be translated"))
-            return
-        }
-        model.translation = RowTranslation(itemID: id, state: .working)
-        Task {
-            let state: RowTranslation.State
-            do {
-                state = .done(try await translation.translate(text))
-            } catch {
-                state = .failed(translation.describe(error))
-            }
-            if model.translation?.itemID == id { model.translation?.state = state }
-        }
     }
 
     /// ⌘V in the Secrets tab: saves the copied text as a secret, named automatically.
@@ -228,6 +221,7 @@ extension PopupController {
         case .edit: "Only text can be edited"
         case .pastePlain: item.kind == .image ? "Images have no text" : "That item has no formatting"
         case .togglePin: "Secrets are always saved"
+        case .proofread, .professional, .shorter, .summarize: "Turn on Apple Intelligence and the writing actions in Settings"
         case .saveAsSecret: item.isSecret ? "It's already a secret" : "Only text can be a secret"
         default: "Not for this item"
         }

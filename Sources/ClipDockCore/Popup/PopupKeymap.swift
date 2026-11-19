@@ -34,6 +34,10 @@ public enum PopupCommand: Equatable, Sendable {
     case previousScope
     /// ⌘L: keep the selected item as a secret, and remove its plain copy from history.
     case saveAsSecret
+    /// ⇧Space (with an empty search) or ⌘Y: see the whole item.
+    case peek
+    /// ⇧⌘↩: put the marked items in a paste stack; each ⌘V in any app pastes the next one.
+    case pasteOneByOne
     // Editing in the search field. A menu-bar app has no Edit menu to supply these.
     case selectAllText
     case cutText
@@ -75,6 +79,7 @@ public enum PopupKeymap {
     static let s: UInt16 = 0x01
     static let l: UInt16 = 0x25
     static let z: UInt16 = 0x06
+    static let y: UInt16 = 0x10
     static let digits: [UInt16: Int] = [
         0x12: 1, 0x13: 2, 0x14: 3, 0x15: 4, 0x17: 5, 0x16: 6, 0x1A: 7, 0x1C: 8, 0x19: 9,
     ]
@@ -98,6 +103,12 @@ public enum PopupKeymap {
         if modifiers == .shift, keyCode == tab {
             return .previousScope
         }
+        if modifiers == .shift, keyCode == space {
+            return .peek
+        }
+        if modifiers == [.command, .shift], keyCode == returnKey || keyCode == keypadEnter {
+            return .pasteOneByOne
+        }
         if modifiers == .command {
             if let number = digits[keyCode] { return .pasteNumber(number) }
             switch keyCode {
@@ -112,6 +123,7 @@ public enum PopupKeymap {
             case e: return .editSelected
             case n: return .newSaved
             case l: return .saveAsSecret
+            case y: return .peek
             case a: return .selectAllText
             case x: return .cutText
             case v: return .pasteText

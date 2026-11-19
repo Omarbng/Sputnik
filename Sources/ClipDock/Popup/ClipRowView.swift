@@ -42,12 +42,16 @@ struct ClipRowView: View {
                 .foregroundStyle(tokens.mutedForeground)
         }
         if item.isTranslation {
-            Text("translated")
-                .font(.system(size: 10, weight: .medium))
+            badge("translated")
+        }
+        if item.isDictation {
+            badge("dictated")
+        }
+        if item.expiresAt != nil {
+            Image(systemName: "timer")
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(tokens.mutedForeground)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 1)
-                .overlay(Capsule().strokeBorder(tokens.border, lineWidth: 1))
+                .help("Sensitive: leaves history 10 minutes after you copied it. ⌘P keeps it.")
         }
         if let appIcon {
             Image(nsImage: appIcon)
@@ -59,6 +63,15 @@ struct ClipRowView: View {
             .monospacedDigit()
             .foregroundStyle(tokens.mutedForeground)
             .frame(minWidth: 24, alignment: .trailing)
+    }
+
+    private func badge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(tokens.mutedForeground)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .overlay(Capsule().strokeBorder(tokens.border, lineWidth: 1))
     }
 
     private var hoverButtons: some View {
@@ -168,34 +181,41 @@ private struct RowIconButton: View {
     }
 }
 
-/// The ⌘T result under a row: progress, the translation, or why it failed.
+/// The result under a row (⌘T translation, or a writing action): progress, the result, or
+/// why it failed.
 struct RowTranslationView: View {
-    let state: RowTranslation.State
+    let result: RowTranslation
     let tokens: Tokens
 
     var body: some View {
+        let isRewrite = result.kind == .rewrite
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "character.bubble")
+            Image(systemName: isRewrite ? "sparkles" : "character.bubble")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(tokens.mutedForeground)
                 .frame(width: 18)
-            switch state {
-            case .working:
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
-                    Text("Translating…").foregroundStyle(tokens.mutedForeground)
-                }
-            case .done(let text):
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(text)
-                        .foregroundStyle(tokens.foreground)
-                        .lineLimit(4)
-                    Text("↩ paste translation · ⌘C copy it")
-                        .font(.system(size: 11))
+            VStack(alignment: .leading, spacing: 3) {
+                if let label = result.label {
+                    Text(label)
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(tokens.mutedForeground)
                 }
-            case .failed(let message):
-                Text(message).foregroundStyle(.red)
+                switch result.state {
+                case .working:
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(isRewrite ? "Writing…" : "Translating…").foregroundStyle(tokens.mutedForeground)
+                    }
+                case .done(let text):
+                    Text(text)
+                        .foregroundStyle(tokens.foreground)
+                        .lineLimit(5)
+                    Text(isRewrite ? "↩ paste it · ⌘C copy it" : "↩ paste translation · ⌘C copy it")
+                        .font(.system(size: 11))
+                        .foregroundStyle(tokens.mutedForeground)
+                case .failed(let message):
+                    Text(message).foregroundStyle(.red)
+                }
             }
         }
         .font(.system(size: 13))

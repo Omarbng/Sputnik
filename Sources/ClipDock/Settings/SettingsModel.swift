@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import ClipDockCore
 import Observation
@@ -39,6 +40,31 @@ final class SettingsModel {
         didSet { AppSettings.ignoredBundleIDs = ignoredApps }
     }
 
+    /// The feature switches (all on unless turned off).
+    private(set) var switches: [AppSettings.Switch: Bool] = [:]
+    var dictationLanguage = AppSettings.dictationLanguage {
+        didSet { AppSettings.dictationLanguage = dictationLanguage }
+    }
+    /// The personal dictionary, one word or name per line.
+    var vocabulary = AppSettings.dictationVocabulary.joined(separator: "\n") {
+        didSet {
+            AppSettings.dictationVocabulary = vocabulary
+                .split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        }
+    }
+
+    private(set) var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
+    private(set) var englishSpeechInstalled = true
+    private(set) var russianSpeechInstalled = true
+    private(set) var downloadingRussian = false
+    private(set) var downloadMessage: String?
+    private(set) var writingProblem: String?
+    /// macOS's own use of fn ("Press 🌐 key to …"); nil when it does nothing.
+    private(set) var fnKeyConflict: String?
+    private(set) var wisprFlowRunning = false
+
     private(set) var launchAtLogin = LaunchAtLogin.isEnabled
     private(set) var launchAtLoginMessage: String?
     private(set) var accessibilityGranted = AccessibilityAccess.isTrusted
@@ -56,6 +82,9 @@ final class SettingsModel {
         ignoredApps = AppSettings.ignoredBundleIDs
         popupTap = AppSettings.popupTap
         translateTap = AppSettings.translateTap
+        switches = Dictionary(uniqueKeysWithValues: AppSettings.Switch.allCases.map { ($0, AppSettings.isOn($0)) })
+        dictationLanguage = AppSettings.dictationLanguage
+        vocabulary = AppSettings.dictationVocabulary.joined(separator: "\n")
         limitsChanged = false
         refreshStatus(languagesMissing: languagesMissing)
     }
@@ -65,6 +94,71 @@ final class SettingsModel {
         accessibilityGranted = AccessibilityAccess.isTrusted
         pasteAllowed = PasteboardAccess.behavior == .alwaysAllow
         languagesInstalled = !languagesMissing
+        microphone = AVCaptureDevice.authorizationStatus(for: .audio)
+        writingProblem = WritingAssistant().unavailableReason
+        fnKeyConflict = Self.fnKeyConflict()
+        wisprFlowRunning = NSWorkspace.shared.runningApplications.contains {
+            $0.bundleIdentifier?.hasPrefix("com.electron.wispr-flow") == true
+        }
+        Task {
+            englishSpeechInstalled = await SpeechLanguages.isInstalled(.english)
+            russianSpeechInstalled = await SpeechLanguages.isInstalled(.russian)
+        }
+    }
+
+    func isOn(_ setting: AppSettings.Switch) -> Bool {
+        switches[setting] ?? AppSettings.isOn(setting)
+    }
+
+    func set(_ setting: AppSettings.Switch, _ on: Bool) {
+        AppSettings.set(setting, on)
+        switches[setting] = on
+    }
+
+    /// Asks once; after that macOS only lets Omar change it in System Settings.
+    func allowMicrophone() {
+        if microphone == .notDetermined {
+            Task {
+                _ = await AVCaptureDevice.requestAccess(for: .audio)
+                microphone = AVCaptureDevice.authorizationStatus(for: .audio)
+            }
+        } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func downloadRussianSpeech() {
+        guard !downloadingRussian else { return }
+        downloadingRussian = true
+        downloadMessage = "Downloading from Apple…"
+        Task {
+            do {
+                try await SpeechLanguages.download(.russian)
+                russianSpeechInstalled = await SpeechLanguages.isInstalled(.russian)
+                downloadMessage = nil
+            } catch {
+                downloadMessage = "The download didn't finish. Try again later."
+            }
+            downloadingRussian = false
+        }
+    }
+
+    func openKeyboardSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Reads (never changes) the "Press 🌐 key to" setting.
+    private static func fnKeyConflict() -> String? {
+        let value = CFPreferencesCopyAppValue("AppleFnUsageType" as CFString, "com.apple.HIToolbox" as CFString) as? Int
+        return switch value {
+        case 0?: nil
+        case 1?: "fn also changes the input source"
+        case 2?: "fn also opens Emoji & Symbols"
+        case 3?: "fn also starts Apple's dictation"
+        default: "fn may also be used by macOS"
+        }
     }
 
     func consumeLimitsChanged() -> Bool {

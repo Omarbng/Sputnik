@@ -1,7 +1,8 @@
 import ClipDockCore
 import Observation
 
-/// A ⌘T translation shown under one row.
+/// A result shown under one row: a ⌘T translation, or an Apple Intelligence rewrite.
+/// ↩ pastes it and ⌘C copies it.
 struct RowTranslation: Equatable {
     enum State: Equatable {
         case working
@@ -9,7 +10,17 @@ struct RowTranslation: Equatable {
         case failed(String)
     }
 
+    enum Kind: Equatable {
+        /// Recorded with the "translated" badge.
+        case translation
+        /// Proofread, Make Professional … (recorded as plain text).
+        case rewrite
+    }
+
     let itemID: Int64
+    var kind = Kind.translation
+    /// Shown above the result ("Proofread").
+    var label: String?
     var state: State
 }
 
@@ -77,6 +88,8 @@ final class PopupViewModel {
     var editor: EditorState?
     /// A saved item waiting for a second ⌘⌫ (or click) before it's deleted.
     var pendingDeleteID: Int64?
+    /// Quick Look (⇧Space, ⌘Y): the item shown in full in place of the list.
+    var peekID: Int64?
 
     /// Set by the popup controller.
     @ObservationIgnored var onPick: ((ClipItem) -> Void)?
@@ -101,12 +114,16 @@ final class PopupViewModel {
 
     var selectedItem: ClipItem? { item(at: selectedIndex) }
 
-    /// The finished translation of the selected row. ↩ and ⌘C use it instead of the item.
+    /// The finished translation (or rewrite) of the selected row. ↩ and ⌘C use it instead of the item.
     var selectedTranslation: String? {
         guard let translation, translation.itemID == selectedItem?.id,
               case .done(let text) = translation.state
         else { return nil }
         return text
+    }
+
+    var peekItem: ClipItem? {
+        peekID.flatMap { history.item(id: $0) }
     }
 
     /// The item at a visible position (saved first, then recent).
@@ -136,6 +153,7 @@ final class PopupViewModel {
         actionMenu = nil
         editor = nil
         pendingDeleteID = nil
+        peekID = nil
         openCount += 1
     }
 

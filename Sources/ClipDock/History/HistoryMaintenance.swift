@@ -7,11 +7,29 @@ final class HistoryMaintenance {
     private let database: HistoryDatabase
     private let history: HistoryModel
     private let hud: HUDController
+    private var expiryTimer: Timer?
 
     init(database: HistoryDatabase, history: HistoryModel, hud: HUDController) {
         self.database = database
         self.history = history
         self.hud = hud
+    }
+
+    /// Sensitive copies leave history when their 10 minutes are up. Checked in memory every
+    /// 15 s; the database is touched only when one is due.
+    func startExpiryTimer() {
+        guard expiryTimer == nil else { return }
+        let timer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.removeExpired() }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        expiryTimer = timer
+    }
+
+    func removeExpired(now: Date = .now) {
+        guard history.items.contains(where: { !$0.isPinned && ($0.expiresAt.map { $0 <= now } ?? false) }) else { return }
+        applyRetention()
     }
 
     /// Asks first. Pinned items are kept.

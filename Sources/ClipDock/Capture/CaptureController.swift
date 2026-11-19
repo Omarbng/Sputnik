@@ -140,7 +140,41 @@ final class CaptureController {
         case .skipped(let reason):
             Log.capture.notice("skipped reason=\(reason.logName, privacy: .public)")
         case .captured(let clip):
-            pipeline.submit(clip, rules: rules, retention: AppSettings.retention)
+            pipeline.submit(Self.markSensitive(cleanLink(clip, changeCount: changeCount)), rules: rules, retention: AppSettings.retention)
         }
+    }
+
+    /// "Clean links": a copied link loses its tracking parameters, in history and on the
+    /// clipboard (unless the copy also carries formatted text or an image, which stays as it was).
+    private func cleanLink(_ clip: CapturedClip, changeCount: Int) -> CapturedClip {
+        guard AppSettings.isOn(.cleanLinks), case .url(let link) = clip.payload,
+              let cleaned = LinkCleaner.clean(link)
+        else { return clip }
+        var copy = clip
+        copy.payload = .url(cleaned)
+        let pasteboard = NSPasteboard.general
+        let types = Set(pasteboard.types ?? [])
+        let rich: Set<NSPasteboard.PasteboardType> = [.html, .rtf, .rtfd, .png, .tiff, .fileURL, .pdf]
+        if pasteboard.changeCount == changeCount, types.isDisjoint(with: rich) {
+            let item = NSPasteboardItem()
+            item.setString(cleaned, forType: .string)
+            item.setString(cleaned, forType: .URL)
+            beginIgnoringChanges()
+            PasteboardWriter.write([item])
+            endIgnoringChanges()
+        }
+        Log.capture.notice("link cleaned chars=\(link.count, privacy: .public)->\(cleaned.count, privacy: .public)")
+        return copy
+    }
+
+    /// "Forget sensitive copies": keys, card numbers, IBANs and codes leave history after 10 minutes.
+    private static func markSensitive(_ clip: CapturedClip) -> CapturedClip {
+        guard AppSettings.isOn(.expireSensitive), clip.kind == .text || clip.kind == .url,
+              let text = clip.storedText, let kind = SensitiveDetector.kind(of: text)
+        else { return clip }
+        var copy = clip
+        copy.expiresAt = clip.capturedAt.addingTimeInterval(SensitiveDetector.lifetime)
+        Log.capture.notice("sensitive kind=\(kind.rawValue, privacy: .public) expiresIn=\(Int(SensitiveDetector.lifetime), privacy: .public)s")
+        return copy
     }
 }

@@ -34,6 +34,13 @@ import ClipDockCore
 ///   snapshot {text: path}          render the popup to a PNG (the behind-window blur doesn't render)
 ///   focused {text}                 log whether the focused text field contains `text`
 ///                                  (a yes/no only; the field's text is never logged)
+///   dictateFile {text: path, field: dictate|command|translate}  a dictation from an audio file
+///                                  (no microphone), typed into the test target
+///   fn {text: down|up|key|esc|ctrl|shift}  feed the fn monitor directly (no system events, so
+///                                  macOS and other fn apps never see it)
+///   pillSnapshot {text: path}      render the dictation pill to a PNG
+///   stack {text: pasted|stop}      the paste stack: as if ⌘V was pressed, or stop it
+///   historyFlags                   log the top items' ids with their badges and expiry
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
@@ -44,7 +51,7 @@ final class DebugHooks {
     static let testTarget = "com.omar.clipdock.testtarget"
     private static let needsTestTarget: Set<String> = [
         "toggle", "dock", "translate", "card", "postDoubleTap", "key", "action", "editor", "fieldCommand", "rowActions",
-        "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow",
+        "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow", "dictateFile", "fn", "stack",
     ]
     /// Posted keys and clicks must land in the popup itself.
     private static let needsPopupKey: Set<String> = ["postKey", "postText", "postMouse"]
@@ -56,6 +63,9 @@ final class DebugHooks {
         let settings: SettingsWindowController
         let maintenance: HistoryMaintenance
         let capture: CaptureController
+        let dictation: DictationController
+        let pasteStack: PasteStackController
+        let history: HistoryModel
     }
 
     init(targets: Targets) {
@@ -176,7 +186,8 @@ final class DebugHooks {
                 fieldLengths=\(popup.editorFields.name.count, privacy: .public)/\(popup.editorFields.text.count, privacy: .public)/\(popup.editorFields.secret.count, privacy: .public) \
                 frame=\(NSStringFromRect(popup.frame), privacy: .public) \
                 onScreen=\(popup.isFullyOnScreen, privacy: .public) \
-                translation=\(Self.describe(model.translation), privacy: .public)
+                translation=\(Self.describe(model.translation), privacy: .public) \
+                peek=\(model.peekID ?? -1, privacy: .public)
                 """)
         }
         observe("focused") { info in
@@ -187,6 +198,45 @@ final class DebugHooks {
                 readable=\(value != nil, privacy: .public) \
                 contains=\(value?.contains(info.text ?? "\u{0}") ?? false, privacy: .public)
                 """)
+        }
+        observe("dictateFile") { info in
+            guard let path = info.text else { return }
+            let mode = DictationMode(rawValue: info.field ?? "dictate") ?? .dictate
+            targets.dictation.dictate(file: URL(fileURLWithPath: path), mode: mode)
+        }
+        observe("fn") { info in
+            let now = ProcessInfo.processInfo.systemUptime
+            let inputs: [HoldToTalkDetector.Input] = switch info.text ?? "" {
+            case "down": [.fnDown(at: now), .modifiers([])]
+            case "up": [.fnUp(at: now)]
+            case "key": [.key(isEscape: false)]
+            case "esc": [.key(isEscape: true)]
+            case "ctrl": [.modifiers([.control])]
+            case "shift": [.modifiers([.shift])]
+            default: []
+            }
+            targets.dictation.monitor.simulate(inputs)
+        }
+        observe("pillSnapshot") { info in
+            if let path = info.text { targets.dictation.pill.snapshot(to: path) }
+        }
+        observe("stack") { info in
+            switch info.text {
+            case "pasted": targets.pasteStack.pasted()
+            case "stop": targets.pasteStack.stop(restore: true)
+            default: break
+            }
+        }
+        observe("historyFlags") { _ in
+            let flags = targets.history.items.prefix(12).map { item in
+                var tags: [String] = [item.kind.rawValue]
+                if item.isTranslation { tags.append("translated") }
+                if item.isDictation { tags.append("dictated") }
+                if let expires = item.expiresAt { tags.append("expiresIn=\(Int(expires.timeIntervalSinceNow))s") }
+                if item.isPinned { tags.append("saved") }
+                return "\(item.id ?? -1):\(tags.joined(separator: "+"))"
+            }
+            Log.app.notice("debug history \(flags.joined(separator: " "), privacy: .public) stack=\(targets.pasteStack.progress ?? "none", privacy: .public)")
         }
         Log.app.notice("debug hooks ready")
     }
@@ -278,7 +328,7 @@ final class DebugHooks {
         guard let translation else { return "none" }
         switch translation.state {
         case .working: return "working(id=\(translation.itemID))"
-        case .done(let text): return "done(id=\(translation.itemID),chars=\(text.count))"
+        case .done(let text): return "done(id=\(translation.itemID),kind=\(translation.kind),label=\(translation.label ?? "-"),chars=\(text.count))"
         case .failed: return "failed(id=\(translation.itemID))"
         }
     }

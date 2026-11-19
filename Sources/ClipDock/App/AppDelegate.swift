@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settings: SettingsWindowController?
     private var maintenance: HistoryMaintenance?
     private var statusItem: StatusItemController?
+    private var writing: WritingAssistant?
+    private var pasteStack: PasteStackController?
+    private var dictation: DictationController?
     #if DEBUG
     private var debugHooks: DebugHooks?
     #endif
@@ -44,17 +47,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 needsAccessibility: { accessibilityCard.show() }
             )
         )
+        let paster = Paster(hud: hud)
         let actions = ItemActions(
-            database: database, history: history, paster: Paster(hud: hud), hud: hud,
+            database: database, history: history, paster: paster, hud: hud,
             translation: translation, capture: capture, secrets: SecretActions(hud: hud, capture: capture)
         )
         let saved = SavedItems(database: database, history: history)
         let thumbnails = ThumbnailCache(blobs: database.blobs)
+        let writing = WritingAssistant()
+        let pasteStack = PasteStackController(database: database, history: history, paster: paster, hud: hud, capture: capture)
+        let tools = PopupTools(
+            writing: writing,
+            images: ImageActions(database: database, capture: capture, paster: paster, hud: hud),
+            contacts: ContactActions(hud: hud),
+            pasteStack: pasteStack
+        )
         let popup = PopupController(
             history: history, icons: icons, thumbnails: thumbnails,
-            actions: actions, saved: saved, translation: translation
+            actions: actions, saved: saved, translation: translation, tools: tools
         )
         let maintenance = HistoryMaintenance(database: database, history: history, hud: hud)
+        let dictation = DictationController(.init(
+            capture: capture, hud: hud, translation: translation, writing: writing,
+            inserter: TextInserter(capture: capture, hud: hud), history: history, actions: actions
+        ))
         let settings = SettingsWindowController(
             icons: icons,
             actions: .init(
@@ -83,7 +99,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pasteAccessCard.show(access: capture?.access ?? PasteboardAccess.behavior)
             },
             allowPasting: { accessibilityCard.show() },
-            downloadLanguages: { languageCard.show() }
+            downloadLanguages: { languageCard.show() },
+            pasteStackProgress: { pasteStack.isActive ? pasteStack.progress : nil },
+            stopPasteStack: { pasteStack.stop(restore: true) }
         ))
         capture.onAccessChange = { [weak statusItem] access in
             statusItem?.refreshIcon()
@@ -101,13 +119,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         doubleTaps.start()
-        accessibilityCard.onGranted = { [weak self] in self?.doubleTaps.start() }
+        dictation.start()
+        dictation.prewarm()
+        accessibilityCard.onGranted = { [weak self] in
+            self?.doubleTaps.start()
+            self?.dictation?.start()
+        }
         // Optional key combos from Settings (none by default). Translation fires on key-up, so the
         // keys are released before ClipDock sends ⌘C.
         KeyboardShortcuts.onKeyDown(for: .openPopup) { [weak popup] in popup?.toggle() }
         KeyboardShortcuts.onKeyUp(for: .translate) { [weak translation] in translation?.translateSelection() }
 
         capture.start()
+        maintenance.startExpiryTimer()
+        ImageActions.removeOldExports()
         statusItem.refreshIcon()
         warmCaches(thumbnails: thumbnails)
         DispatchQueue.main.async { popup.prewarm() }
@@ -118,13 +143,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.settings = settings
         self.maintenance = maintenance
         self.statusItem = statusItem
+        self.writing = writing
+        self.pasteStack = pasteStack
+        self.dictation = dictation
         #if DEBUG
         // Test-only remote control. Off unless launched with `open --env CLIPDOCK_DEBUG_HOOKS=1`,
         // because any local process could otherwise drive pastes through ClipDock's permissions.
         if ProcessInfo.processInfo.environment["CLIPDOCK_DEBUG_HOOKS"] == "1" {
             debugHooks = DebugHooks(targets: .init(
                 popup: popup, translation: translation, card: translationCard,
-                settings: settings, maintenance: maintenance, capture: capture
+                settings: settings, maintenance: maintenance, capture: capture,
+                dictation: dictation, pasteStack: pasteStack, history: history
             ))
         }
         #endif

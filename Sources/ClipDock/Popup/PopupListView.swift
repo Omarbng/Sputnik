@@ -100,7 +100,7 @@ struct PopupListView: View {
                 }
                 .onTapGesture { model.onPick?(item) }
                 if let translation = model.translation, translation.itemID == item.id {
-                    RowTranslationView(state: translation.state, tokens: tokens)
+                    RowTranslationView(result: translation, tokens: tokens)
                 }
             }
             .id(item.id ?? -1)

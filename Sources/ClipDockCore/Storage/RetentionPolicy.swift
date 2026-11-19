@@ -10,14 +10,16 @@ public struct RetentionPolicy: Sendable, Equatable {
         self.maxAgeDays = maxAgeDays
     }
 
-    /// IDs of unpinned items that are older than `maxAgeDays`, or beyond the newest `maxUnpinned`.
+    /// IDs of unpinned items that are older than `maxAgeDays`, beyond the newest `maxUnpinned`,
+    /// or sensitive copies whose time is up (`expiresAt`).
     public func expiredIDs(in items: [ClipItem], now: Date) -> [Int64] {
         let cutoff = now.addingTimeInterval(-Double(maxAgeDays) * 86_400)
         let unpinned = items
             .filter { !$0.isPinned }
             .sorted { $0.lastUsedAt > $1.lastUsedAt }
         return unpinned.enumerated().compactMap { index, item in
-            (index >= maxUnpinned || item.lastUsedAt < cutoff) ? item.id : nil
+            let timeIsUp = item.expiresAt.map { $0 <= now } ?? false
+            return (index >= maxUnpinned || item.lastUsedAt < cutoff || timeIsUp) ? item.id : nil
         }
     }
 }

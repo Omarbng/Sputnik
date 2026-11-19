@@ -21,7 +21,7 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
     }
 
     func show(
-        translation: String, direction: TranslationDirection,
+        translation: String, direction: TranslationDirection, note: String = "", primaryTitle: String = "Replace",
         onReplace: @escaping () -> Void, onCopy: @escaping () -> Void
     ) {
         self.onCopy = onCopy
@@ -30,6 +30,8 @@ final class TranslationCardController: NSObject, NSWindowDelegate {
         let host = NSHostingView(rootView: TranslationCardView(
             text: translation,
             direction: direction,
+            note: note,
+            primaryTitle: primaryTitle,
             textHeight: textHeight,
             onReplace: { [weak self] in self?.replace() },
             onCopy: { [weak self] in self?.copyTranslation() }
@@ -121,6 +123,10 @@ struct TranslationCardView: View {
 
     let text: String
     let direction: TranslationDirection
+    /// "from clipboard", "reply" …
+    let note: String
+    /// "Replace" over a selection, "Paste" when the text came from the clipboard.
+    let primaryTitle: String
     let textHeight: CGFloat
     let onReplace: () -> Void
     let onCopy: () -> Void
@@ -130,7 +136,7 @@ struct TranslationCardView: View {
         let tokens = Tokens.for(scheme)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(direction.label)
+                Text(note.isEmpty ? direction.label : "\(direction.label) · \(note)")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(tokens.mutedForeground)
                 Spacer()
@@ -149,7 +155,7 @@ struct TranslationCardView: View {
             HStack(spacing: 8) {
                 Spacer()
                 cardButton("Copy", keys: "⌘C", tokens: tokens, prominent: false, action: onCopy)
-                cardButton("Replace", keys: "↩", tokens: tokens, prominent: true, action: onReplace)
+                cardButton(primaryTitle, keys: "↩", tokens: tokens, prominent: true, action: onReplace)
             }
         }
         .padding(16)

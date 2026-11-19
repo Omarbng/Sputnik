@@ -10,6 +10,8 @@ struct PopupRootView: View {
     let thumbnails: ThumbnailCache
     let searchField: NSTextField
     let editorFields: EditorFields
+    /// Quick Look's full image (a blob or a copied file).
+    let peekImage: (ClipItem) -> Data?
     let onDock: (DockItem) -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -34,8 +36,13 @@ struct PopupRootView: View {
         ZStack(alignment: .topTrailing) {
             // The list stays in place under the editor, so the search field keeps its view.
             listCard(tokens)
-                .opacity(model.editor == nil ? 1 : 0)
-                .allowsHitTesting(model.editor == nil)
+                .opacity(model.editor == nil && model.peekItem == nil ? 1 : 0)
+                .allowsHitTesting(model.editor == nil && model.peekItem == nil)
+            if let item = model.peekItem, model.editor == nil {
+                PeekView(item: item, tokens: tokens, imageData: peekImage)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            }
             if let editor = model.editor {
                 EditorView(state: editor, fields: editorFields, tokens: tokens) { command in
                     model.onEditorCommand?(command)
@@ -57,6 +64,7 @@ struct PopupRootView: View {
             }
         }
         .animation(Motion.fade(Motion.reduceMotion), value: model.actionMenu?.itemID)
+        .animation(Motion.fade(Motion.reduceMotion), value: model.peekID)
         .frame(width: PopupLayout.cardWidth, height: PopupLayout.cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: PopupLayout.cardCornerRadius, style: .continuous))
         .background(MaterialBackground(cornerRadius: PopupLayout.cardCornerRadius))

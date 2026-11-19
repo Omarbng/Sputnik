@@ -137,7 +137,7 @@ struct ClipActionTests {
     @Test("Text gets every action; Paste as Plain Text only when it has formatting")
     func text() {
         #expect(ClipAction.available(for: item(.text)) == [
-            .paste, .copy, .edit, .translate, .togglePin, .saveAsSecret, .uppercase, .lowercase, .tidy, .delete,
+            .paste, .copy, .edit, .translate, .peek, .togglePin, .saveAsSecret, .uppercase, .lowercase, .tidy, .delete,
         ])
         #expect(ClipAction.available(for: item(.text, rtf: "a.rtf")).prefix(2) == [.paste, .pastePlain])
     }
