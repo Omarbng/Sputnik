@@ -44,6 +44,9 @@ import ClipDockCore
 ///   appearance {text: dark|light|system}  ClipDock's own appearance (not the system's)
 ///   cardSnapshot / hudSnapshot {text: path}  render the translation card or the HUD
 ///   hud {text, field: info|error}  show a HUD message
+///   rightOption {text: down|up|click}  right ⌥ as the talk key, fed to the monitor directly
+///   proofread                      same as the proofread shortcut (double-tap ⇧)
+///   guide / guideClose / guideSnapshot {text: path}  the Shortcuts window
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
@@ -55,6 +58,7 @@ final class DebugHooks {
     private static let needsTestTarget: Set<String> = [
         "toggle", "dock", "translate", "card", "postDoubleTap", "key", "action", "editor", "fieldCommand", "rowActions",
         "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow", "dictateFile", "fn", "stack", "hud",
+        "proofread", "rightOption", "guide",
     ]
     /// Posted keys and clicks must land in the popup itself.
     private static let needsPopupKey: Set<String> = ["postKey", "postText", "postMouse"]
@@ -70,6 +74,8 @@ final class DebugHooks {
         let pasteStack: PasteStackController
         let history: HistoryModel
         let hud: HUDController
+        let proofreader: SelectionProofreader
+        let guide: GuideWindowController
     }
 
     init(targets: Targets) {
@@ -220,6 +226,13 @@ final class DebugHooks {
             default: []
             }
             targets.dictation.monitor.simulate(inputs)
+        }
+        observe("rightOption") { info in targets.dictation.monitor.simulateRightOption(info.text ?? "") }
+        observe("proofread") { _ in targets.proofreader.proofreadSelection() }
+        observe("guide") { _ in targets.guide.show() }
+        observe("guideClose") { _ in targets.guide.close() }
+        observe("guideSnapshot") { info in
+            if let path = info.text { targets.guide.snapshot(to: path) }
         }
         observe("pillSnapshot") { info in
             if let path = info.text { targets.dictation.pill.snapshot(to: path) }

@@ -32,7 +32,8 @@ struct SettingsView: View {
             Section("Shortcuts") {
                 tapPicker("Open clipboard history", selection: $model.popupTap)
                 tapPicker("Translate selected text", selection: $model.translateTap)
-                note("Tap the key twice, quickly, on its own. In the translation card, ↩ replaces the text, ⌘C copies it, and Esc closes it. Hold fn to dictate (see Dictation).")
+                tapPicker("Proofread selected text", selection: $model.proofreadTap)
+                note("Tap the key twice, quickly, on its own. In the translation card, ↩ replaces the text, ⌘C copies it, and Esc closes it. Proofread fixes the selection in place with Apple Intelligence (⌘Z undoes it). Hold fn to dictate (see Dictation). Menu bar → Shortcuts… lists every key.")
             }
             Section("Key combinations (optional)") {
                 KeyboardShortcuts.Recorder("Open clipboard history", name: .openPopup)
@@ -120,7 +121,9 @@ struct SettingsView: View {
         Form {
             Section("Dictation") {
                 switchRow(.dictation, "Hold fn to dictate",
-                          "Hold fn, speak, let go: the text is typed where you are. Double-tap fn for hands-free (fn again to finish, Esc to cancel). Hold fn + ⇧ to type it translated.")
+                          "Hold fn, speak, let go: the text is typed where you are. Double-tap fn for hands-free (fn again to finish, Esc to cancel). Tap ⇧ while talking to type it translated.")
+                switchRow(.rightOptionTalk, "Hold right ⌥ to dictate too",
+                          "Works like fn, for keyboards without it or if it's easier to reach. A quick tap (⌥⌥) and ⌥ with a letter still work as usual.")
                 Picker("Language", selection: $model.dictationLanguage) {
                     ForEach(AppSettings.DictationLanguage.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
@@ -129,8 +132,10 @@ struct SettingsView: View {
                 switchRow(.dictationPolish, "Polish with Apple Intelligence",
                           "Fixes punctuation, false starts and self-corrections (“at three, actually four” → “at four”), in English and Russian. On this Mac; adds about half a second. A result that changes language or length too much is thrown away.")
                 if let problem = model.writingProblem, model.isOn(.dictationPolish) { warning(problem) }
+                switchRow(.sayLanguage, "Say the language first",
+                          "When translating (fn + ⇧), start with “in French”, “in Russian” or “in English” (or “по-французски”, “на английском”) to pick the language just this once. Those words aren't typed.")
                 switchRow(.voiceCommands, "Voice commands",
-                          "Select text, hold fn + ⌃ and say “translate to Russian”, “make it shorter”, “proofread” or anything else. Say “insert <name>” to paste a saved item.")
+                          "Select text, hold fn, tap ⌃ and say “translate to Russian”, “make it shorter”, “proofread” or anything else. Say “insert <name>” to paste a saved item.")
             }
             Section("Personal dictionary") {
                 TextEditor(text: $model.vocabulary)

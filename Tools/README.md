@@ -14,6 +14,11 @@ directly — never post real fn events: macOS and Wispr Flow would react), `pill
 (paste stack), `historyFlags` (badges and expiry by id). The scripted run of every new feature is
 `feat-burst.sh`/`feat-waiter.sh` in the session scratchpad (copied into PROGRESS.md's results).
 
+Hooks added 2026-11-20: `rightOption {text: down|up|click}` (right ⌥ as the talk key, fed to the
+monitor directly, like `fn`), `proofread` (the ⇧⇧ action), `guide` / `guideClose` /
+`guideSnapshot {text: path}` (the Shortcuts window). `postDoubleTap {text: "shift"}` posts two real
+⇧ taps, which type nothing, to test ⇧⇧ end to end (test target frontmost only).
+
 Before a test sends ⌘V, it must check that the intended app is frontmost. Otherwise the paste lands in
 whatever you're using at that moment.
 

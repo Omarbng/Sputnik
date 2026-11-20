@@ -14,7 +14,7 @@ public enum DictationMode: String, Sendable, Equatable {
 /// The fn key as a push-to-talk key, like Wispr Flow:
 /// - hold fn, speak, release: the text is typed (a hold must last `holdThreshold`)
 /// - double-tap fn: hands-free; tap fn again to finish, Esc cancels
-/// - add ⌃ while holding for a command, ⇧ to translate
+/// - tap ⌃ while talking for a command, ⇧ to translate (one tap is enough; it sticks)
 /// - any other key while holding cancels, so fn shortcuts (fn+arrows, fn+⌃+arrows, fn+E, F-keys)
 ///   keep working and nothing is typed.
 ///
@@ -22,7 +22,9 @@ public enum DictationMode: String, Sendable, Equatable {
 /// that audio away.
 public struct HoldToTalkDetector: Sendable {
     public enum Input: Sendable, Equatable {
-        case fnDown(at: TimeInterval)
+        /// The talk key went down. `allowsHandsFree` is false for keys that are double-tapped for
+        /// something else (right ⌥: ⌥⌥ opens the clipboard), so two taps never start hands-free.
+        case fnDown(at: TimeInterval, allowsHandsFree: Bool = true)
         case fnUp(at: TimeInterval)
         /// The other modifiers now held.
         case modifiers(Set<TapModifier>)
@@ -76,7 +78,7 @@ public struct HoldToTalkDetector: Sendable {
 
     public mutating func handle(_ input: Input) -> [Output] {
         switch input {
-        case .fnDown(let time):
+        case .fnDown(let time, let allowsHandsFree):
             switch state {
             case .idle:
                 startMode()
@@ -84,7 +86,7 @@ public struct HoldToTalkDetector: Sendable {
                 return [.begin]
             case .tapped(let tappedAt):
                 startMode()
-                state = .pressed(at: time, second: time - tappedAt <= doubleTapGap)
+                state = .pressed(at: time, second: allowsHandsFree && time - tappedAt <= doubleTapGap)
                 return [.begin]
             case .handsFree:
                 state = .waitingForRelease
@@ -132,6 +134,8 @@ public struct HoldToTalkDetector: Sendable {
             switch state {
             case .pressed, .holding, .handsFree:
                 if held.contains(.command) || held.contains(.option) {
+                    // Hands-free keeps listening while Omar works (⌘Tab, ⌘C …).
+                    if case .handsFree = state { return [] }
                     return cancel()  // fn+⌘ / fn+⌥ are someone else's shortcuts
                 }
                 modifiers.formUnion(held)

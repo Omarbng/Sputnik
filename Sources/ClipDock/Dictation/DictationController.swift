@@ -7,7 +7,9 @@ import ClipDockCore
 /// - Double-tap fn: hands-free until fn again; Esc cancels.
 /// - fn + ⌃: a command for the selected text ("translate to Russian", "make it shorter"), or
 ///   "insert <saved item>".
-/// - fn + ⇧: typed translated (Russian → English; English → the reply language or Settings').
+/// - fn + ⇧: typed translated (Russian → English; English → the reply language or Settings'),
+///   or into the language said first ("in French, …").
+/// - Right ⌥ works like fn when that switch is on (see `FnKeyMonitor`).
 /// Audio stays in memory and is dropped after recognition. Logs hold durations, word counts,
 /// languages and modes, never what was said.
 @MainActor
@@ -42,6 +44,10 @@ final class DictationController {
         self.deps = deps
         monitor.onOutput = { [weak self] output in self?.handle(output) }
     }
+
+    /// True while listening or finishing, so the double-tap shortcuts stay quiet (⇧ and ⌃ are
+    /// tapped during dictation to pick a mode).
+    var isBusy: Bool { monitor.isListening || audio != nil || isFinishing }
 
     /// (Re)installs the fn monitor. Call again after Accessibility is granted.
     func start() {
@@ -268,10 +274,26 @@ final class DictationController {
     }
 
     /// fn + ⇧: Russian is typed in English; English in the reply language (or Settings').
+    /// "In French, …" / "по-английски …" first picks the language for this one.
     private func deliverTranslated(_ spoken: String) async {
         pill.state.phase = .working
+        var text = spoken
+        var said: TranslationLanguage?
+        if AppSettings.isOn(.sayLanguage), let split = SpokenLanguage.split(spoken) {
+            guard !split.rest.isEmpty else {
+                deps.hud.show("Say what to translate after the language", style: .error)
+                return
+            }
+            text = split.rest
+            said = split.language
+        }
         do {
-            let translated = try await deps.translation.translate(spoken)
+            let translated = if let said {
+                try await deps.translation.translate(text, into: said)
+            } else {
+                try await deps.translation.translate(text)
+            }
+            Log.dictation.notice("translated saidLanguage=\(said?.code ?? "none", privacy: .public)")
             await type(translated, isTranslation: true)
         } catch {
             deps.hud.show(deps.translation.describe(error), style: .error)

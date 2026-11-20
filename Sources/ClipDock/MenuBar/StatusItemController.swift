@@ -2,7 +2,7 @@ import AppKit
 @preconcurrency import KeyboardShortcuts
 
 /// Owns the menu-bar icon and its menu: Open ClipDock, Pause capture, Clear history…,
-/// Settings…, Quit, plus setup items while something still needs a permission or download.
+/// Shortcuts…, Settings…, Quit, plus setup items while something still needs a permission or download.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     struct Actions {
@@ -21,6 +21,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         /// "2 of 3" while a paste stack is waiting for ⌘V, else nil.
         var pasteStackProgress: () -> String?
         var stopPasteStack: () -> Void
+        var openGuide: () -> Void
     }
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -68,6 +69,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(item("Clear History…", #selector(clearHistory)))
         menu.addItem(.separator())
 
+        let guide = item("Shortcuts…", #selector(openGuide))
+        guide.subtitle = "Every key and voice command"
+        menu.addItem(guide)
         let settings = item("Settings…", #selector(openSettings))
         settings.keyEquivalent = ","
         menu.addItem(settings)
@@ -136,4 +140,5 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func allowPasting() { actions.allowPasting() }
     @objc private func downloadLanguages() { actions.downloadLanguages() }
     @objc private func stopPasteStack() { actions.stopPasteStack() }
+    @objc private func openGuide() { actions.openGuide() }
 }

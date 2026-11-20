@@ -22,6 +22,8 @@
   these switches"). See "Clipboard features (2026-11-19)".
 - [x] **M9 — Dictation, fn key** (2026-11-19, Omar chose fn; "ignore French, I don't speak
   French"). See "Dictation (2026-11-19)". Needs Omar's own voice, with Wispr Flow quit.
+- [x] **Easier to use** (2026-11-20, Omar: "make it easier"): say the language first, ⇧⇧
+  proofreads in place, menu bar → Shortcuts…, hold right ⌥ to talk. See "Easier to use".
 
 ## How to build and test
 - `./run.sh` builds, signs, installs to `~/Applications/ClipDock.app`, and relaunches.
@@ -493,6 +495,34 @@
 - **Row ⋯/trash buttons and tab chips** press in slightly.
 - Checked with snapshots of the popup, menu, card and HUD in dark and light (ClipDock's own
   appearance switched by a debug hook, never the system's).
+
+## Easier to use (2026-11-20, Omar: "make it easier")
+All four ideas from the guide Claude wrote him, each with a switch (or an Off choice) in Settings:
+- **Say the language first** (Dictation → "Say the language first", on): with fn + ⇧, starting
+  with "in French", "in Russian", "in English", "translate to/into …", "по-французски",
+  "по-английски", "на английском" … translates into that language this once (`SpokenLanguage`).
+  The lead-in isn't typed. A bare "to French …" isn't a lead-in (too often a sentence), and
+  neither is one naming the language the rest is already in ("In English we say…", "На русском
+  рынке…"). Only the language said: HUD "Say what to translate after the language".
+- **Double-tap ⇧ proofreads the selection in place** (General → Shortcuts → "Proofread selected
+  text", default ⇧, can be Off or another key; picking a key another shortcut uses swaps them):
+  `SelectionProofreader` copies the selection (⌘C, clipboard put back), runs Apple
+  Intelligence's Proofread, and pastes over it if the target app is still frontmost; ⌘Z undoes.
+  `ProofreadOutcome` keeps the selection's leading/trailing whitespace, says "No mistakes found"
+  when nothing changed, and refuses results that change the length by more than max(12, 30%) or
+  the alphabet. The corrected text goes into history. Ignored while the popup is open.
+- **Menu bar → Shortcuts…** (`GuideWindowController`, `ShortcutGuide`): Talk, Selected text and
+  Clipboard sections, built from the current settings (changed keys show as set; features
+  switched off aren't listed), with a link to Settings.
+- **Hold right ⌥ to talk** (Dictation → "Hold right ⌥ to dictate too", on): works like fn, but
+  through `DelayedHoldKey`, so it starts listening only after 0.2 s held on its own. Quick taps
+  (⌥⌥ for the clipboard) and ⌥ + a letter never touch the microphone, two taps never start
+  hands-free, and a click while holding cancels (⌥-click).
+- **Also fixed:** hands-free dictation no longer stops when ⌘ or ⌥ is pressed (⌘Tab, ⌘C); only
+  fn finishes it and Esc cancels, as intended. The double-tap shortcuts are ignored while
+  dictating, so tapping ⇧ or ⌃ to pick a mode can't also trigger ⇧⇧ or ⌃⌃.
+- Unit tests: `EasierShortcutsTests` (lead-ins, right-⌥ gate, hands-free, proofread outcome,
+  guide). 156 tests in 37 suites pass.
 
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by

@@ -16,17 +16,26 @@ final class SettingsModel {
     var retentionDays = AppSettings.retentionDays {
         didSet { AppSettings.retentionDays = retentionDays; limitsChanged = true }
     }
-    /// The double-tap keys. Picking the other one's key swaps them, so they never clash.
+    /// The double-tap keys. Picking a key another one uses swaps them, so they never clash.
     var popupTap = AppSettings.popupTap {
         didSet {
             if popupTap != nil, popupTap == translateTap { translateTap = oldValue }
+            if popupTap != nil, popupTap == proofreadTap { proofreadTap = oldValue }
             AppSettings.popupTap = popupTap
         }
     }
     var translateTap = AppSettings.translateTap {
         didSet {
             if translateTap != nil, translateTap == popupTap { popupTap = oldValue }
+            if translateTap != nil, translateTap == proofreadTap { proofreadTap = oldValue }
             AppSettings.translateTap = translateTap
+        }
+    }
+    var proofreadTap = AppSettings.proofreadTap {
+        didSet {
+            if proofreadTap != nil, proofreadTap == popupTap { popupTap = oldValue }
+            if proofreadTap != nil, proofreadTap == translateTap { translateTap = oldValue }
+            AppSettings.proofreadTap = proofreadTap
         }
     }
 
@@ -82,6 +91,7 @@ final class SettingsModel {
         ignoredApps = AppSettings.ignoredBundleIDs
         popupTap = AppSettings.popupTap
         translateTap = AppSettings.translateTap
+        proofreadTap = AppSettings.proofreadTap
         switches = Dictionary(uniqueKeysWithValues: AppSettings.Switch.allCases.map { ($0, AppSettings.isOn($0)) })
         dictationLanguage = AppSettings.dictationLanguage
         vocabulary = AppSettings.dictationVocabulary.joined(separator: "\n")

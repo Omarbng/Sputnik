@@ -54,7 +54,8 @@ combos (such as ⌘⇧V) can still be recorded there.
 | Open popup at cursor | tap ⌥ twice | |
 | Translate selected text | tap ⌃ twice | A card shows the translation: ↩ replaces the selection, ⌘C copies, Esc closes. This replaces the old ⌥⌘T and ⇧⌥⌘T. |
 | Translate with the other engine | (M6, to be decided) | Uses Claude if the default is Apple, or Apple if the default is Claude. |
-| Dictate | hold fn | Added 2026-11-19 (Omar chose fn). Double-tap fn = hands-free (fn again finishes, Esc cancels). fn + ⌃ = voice command on the selection; fn + ⇧ = type it translated. |
+| Dictate | hold fn | Added 2026-11-19 (Omar chose fn). Double-tap fn = hands-free (fn again finishes, Esc cancels). fn + ⌃ = voice command on the selection; fn + ⇧ = type it translated (one tap of ⌃/⇧ while talking is enough). Holding right ⌥ works too (added 2026-11-20, switch in Settings). |
+| Proofread selected text | tap ⇧ twice | Added 2026-11-20 (Omar: "make it easier"). Fixed in place with Apple Intelligence; ⌘Z undoes. |
 
 **Inside the popup**
 
@@ -185,7 +186,7 @@ combos (such as ⌘⇧V) can still be recorded there.
 
 ### 4.5 Menu bar
 - **Icon:** an SF Symbol such as `doc.on.clipboard`. It changes while capture is paused.
-- **Menu:** Open ClipDock, Pause capture (15 min / 1 hour / until resumed), Clear history… (asks for confirmation and deletes rows and blobs), Settings…, Quit.
+- **Menu:** Open ClipDock, Pause capture (15 min / 1 hour / until resumed), Clear history… (asks for confirmation and deletes rows and blobs), Shortcuts… (added 2026-11-20: every key and voice command, as currently set), Settings…, Quit.
 
 ### 4.6 Settings window
 Keep it small, with these settings:
@@ -199,6 +200,8 @@ Keep it small, with these settings:
 - **permission status:** Accessibility and Paste from Other Apps, each with an "Open Settings" button
 - **Changed 2026-11-19:** four tabs (General, Clipboard, Translation, Dictation), with an on/off
   switch for every feature in 4.4 (added part), 4.9 (writing actions), 4.10 and 4.11, plus microphone status
+- **Added 2026-11-20:** the proofread double-tap key (General), "Hold right ⌥ to dictate too" and
+  "Say the language first" (Dictation)
 
 ### 4.8 Saved items and secrets (added 2026-11-11, Omar)
 - The Pinned tab is now **Saved**. It holds pinned clips (⌘P) and text Omar types in with ⌘N
@@ -249,6 +252,9 @@ Keep it small, with these settings:
   working, and turn amber (fn + ⌃) or blue (fn + ⇧).
 - Voice commands: "insert <saved item name>"; fn + ⌃ on a selection: translate to …, proofread,
   shorter, professional, summarize, or any instruction (Apple Intelligence).
+- **Added 2026-11-20:** fn + ⇧ starting with "in French" / "по-английски" … translates into that
+  language this once (the lead-in isn't typed). Right ⌥ held 0.2 s on its own works like fn (no
+  hands-free, a click cancels). Hands-free ignores ⌘ and ⌥. Menu bar → Shortcuts… lists every key.
 - Settings: language (automatic / English / Russian), filler rules, polish, commands, personal
   dictionary (`contextualStrings`), status of microphone, languages, the fn key and Wispr Flow.
 

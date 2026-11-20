@@ -19,6 +19,7 @@ enum AppSettings {
         static let pausedUntil = "pausedUntil"
         static let popupTap = "popupDoubleTap"
         static let translateTap = "translateDoubleTap"
+        static let proofreadTap = "proofreadDoubleTap"
         static let didMigrateToDoubleTaps = "didMigrateToDoubleTaps"
         // Switches added 2026-11-19 (all on by default).
         static let translateClipboard = "translateClipboardWhenNothingSelected"
@@ -32,6 +33,9 @@ enum AppSettings {
         static let dictationPolish = "dictationPolishWithAppleIntelligence"
         static let voiceCommands = "dictationVoiceCommands"
         static let dictationVocabulary = "dictationVocabulary"
+        // Added 2026-11-20 ("make it easier").
+        static let rightOptionTalk = "dictationHoldRightOption"
+        static let sayLanguage = "dictationSayLanguageFirst"
     }
 
     /// The on/off switches in Settings. Each is on unless Omar turns it off.
@@ -54,6 +58,10 @@ enum AppSettings {
         case dictationPolish
         /// fn+⌃ commands, and "insert <saved item>" while dictating.
         case voiceCommands
+        /// Holding right ⌥ works like holding fn.
+        case rightOptionTalk
+        /// fn+⇧ that starts with "in French" / "по-английски" translates into that language.
+        case sayLanguage
 
         var key: String {
             switch self {
@@ -66,6 +74,8 @@ enum AppSettings {
             case .dictationRules: Key.dictationRules
             case .dictationPolish: Key.dictationPolish
             case .voiceCommands: Key.voiceCommands
+            case .rightOptionTalk: Key.rightOptionTalk
+            case .sayLanguage: Key.sayLanguage
             }
         }
     }
@@ -112,6 +122,12 @@ enum AppSettings {
     static var translateTap: TapModifier? {
         get { tapSetting(Key.translateTap, default: .control) }
         set { defaults.set(newValue?.rawValue ?? "off", forKey: Key.translateTap) }
+    }
+
+    /// The modifier to double-tap to proofread the selected text in place (default ⇧), or nil.
+    static var proofreadTap: TapModifier? {
+        get { tapSetting(Key.proofreadTap, default: .shift) }
+        set { defaults.set(newValue?.rawValue ?? "off", forKey: Key.proofreadTap) }
     }
 
     private static func tapSetting(_ key: String, default fallback: TapModifier) -> TapModifier? {

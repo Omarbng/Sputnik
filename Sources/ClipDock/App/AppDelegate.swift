@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let accessibilityCard = AccessibilityCardController()
     private let languageCard = LanguagePackCardController()
     private let doubleTaps = DoubleTapMonitor()
+    private let guide = GuideWindowController()
     private var capture: CaptureController?
     private var translation: TranslationService?
     private var popup: PopupController?
@@ -20,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var writing: WritingAssistant?
     private var pasteStack: PasteStackController?
     private var dictation: DictationController?
+    private var proofreader: SelectionProofreader?
     #if DEBUG
     private var debugHooks: DebugHooks?
     #endif
@@ -67,10 +69,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             actions: actions, saved: saved, translation: translation, tools: tools
         )
         let maintenance = HistoryMaintenance(database: database, history: history, hud: hud)
+        let inserter = TextInserter(capture: capture, hud: hud)
         let dictation = DictationController(.init(
             capture: capture, hud: hud, translation: translation, writing: writing,
-            inserter: TextInserter(capture: capture, hud: hud), history: history, actions: actions
+            inserter: inserter, history: history, actions: actions
         ))
+        let proofreader = SelectionProofreader(writing: writing, inserter: inserter, hud: hud) {
+            accessibilityCard.show()
+        }
         let settings = SettingsWindowController(
             icons: icons,
             actions: .init(
@@ -84,6 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if limitsChanged { maintenance.applyRetention() }
         }
         popup.onOpenSettings = { settings.show() }
+        let guide = self.guide
+        guide.onOpenSettings = { settings.show() }
 
         let statusItem = StatusItemController(actions: .init(
             hasClipboardAccess: { [weak capture] in capture?.hasAccess ?? false },
@@ -101,7 +109,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             allowPasting: { accessibilityCard.show() },
             downloadLanguages: { languageCard.show() },
             pasteStackProgress: { pasteStack.isActive ? pasteStack.progress : nil },
-            stopPasteStack: { pasteStack.stop(restore: true) }
+            stopPasteStack: { pasteStack.stop(restore: true) },
+            openGuide: { guide.show() }
         ))
         capture.onAccessChange = { [weak statusItem] access in
             statusItem?.refreshIcon()
@@ -110,12 +119,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capture.onPauseChange = { [weak statusItem] in statusItem?.refreshIcon() }
         languageCard.onReady = { hud.show("Translation is ready") }
 
-        // Main shortcuts: double-tap ⌥ (clipboard) and ⌃ (translate), changeable in Settings.
-        doubleTaps.onDoubleTap = { [weak popup, weak translation] modifier in
+        // Main shortcuts: double-tap ⌥ (clipboard), ⌃ (translate) and ⇧ (proofread), changeable
+        // in Settings. Quiet while dictating, where ⇧ and ⌃ are tapped to pick a mode.
+        doubleTaps.onDoubleTap = { [weak popup, weak translation, weak dictation, weak proofreader] modifier in
+            guard dictation?.isBusy != true else { return }
             if modifier == AppSettings.popupTap {
                 popup?.toggle()
             } else if modifier == AppSettings.translateTap {
                 translation?.translateSelection()
+            } else if modifier == AppSettings.proofreadTap, popup?.isVisible != true {
+                proofreader?.proofreadSelection()
             }
         }
         doubleTaps.start()
@@ -146,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.writing = writing
         self.pasteStack = pasteStack
         self.dictation = dictation
+        self.proofreader = proofreader
         #if DEBUG
         // Test-only remote control. Off unless launched with `open --env CLIPDOCK_DEBUG_HOOKS=1`,
         // because any local process could otherwise drive pastes through ClipDock's permissions.
@@ -153,7 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             debugHooks = DebugHooks(targets: .init(
                 popup: popup, translation: translation, card: translationCard,
                 settings: settings, maintenance: maintenance, capture: capture,
-                dictation: dictation, pasteStack: pasteStack, history: history, hud: hud
+                dictation: dictation, pasteStack: pasteStack, history: history, hud: hud,
+                proofreader: proofreader, guide: guide
             ))
         }
         #endif
@@ -161,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.notice("""
             settings popupTap=\(AppSettings.popupTap?.rawValue ?? "off", privacy: .public) \
             translateTap=\(AppSettings.translateTap?.rawValue ?? "off", privacy: .public) \
+            proofreadTap=\(AppSettings.proofreadTap?.rawValue ?? "off", privacy: .public) \
+            rightOptionTalk=\(AppSettings.isOn(.rightOptionTalk), privacy: .public) \
             englishInto=\(AppSettings.englishTarget.code, privacy: .public) \
             maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
             days=\(AppSettings.retentionDays, privacy: .public) \
