@@ -12,7 +12,7 @@ final class CardWindow: NSObject, NSWindowDelegate {
     func show(_ view: some View) {
         if window == nil {
             let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: true)
-            window.title = "ClipDock"
+            window.title = "Sputnik"
             window.isReleasedWhenClosed = false
             window.delegate = self
             self.window = window

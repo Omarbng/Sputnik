@@ -51,7 +51,7 @@ final class GuideWindowController: NSObject, NSWindowDelegate {
             rightOption: AppSettings.isOn(.rightOptionTalk),
             sayLanguage: AppSettings.isOn(.sayLanguage),
             voiceCommands: AppSettings.isOn(.voiceCommands),
-            englishTarget: AppSettings.englishTarget
+            languages: AppSettings.languages
         )
     }
 

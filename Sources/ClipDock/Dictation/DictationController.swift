@@ -97,7 +97,7 @@ final class DictationController {
         guard !Self.wisprFlowIsRunning else {
             if !didExplainWispr {
                 didExplainWispr = true
-                deps.hud.show("Wispr Flow has fn — quit it to dictate with ClipDock", style: .error)
+                deps.hud.show("Wispr Flow has fn — quit it to dictate with Sputnik", style: .error)
             }
             Log.dictation.notice("stopped reason=wisprFlowRunning")
             return
@@ -262,8 +262,7 @@ final class DictationController {
         var text = spoken
         if AppSettings.isOn(.dictationPolish), deps.writing.isAvailable {
             pill.state.phase = .working
-            let style: RewriteStyle = language == .russian ? .dictationRussian : .dictation
-            if let polished = try? await deps.writing.rewrite(spoken, style: style),
+            if let polished = try? await deps.writing.polishDictation(spoken, language: language),
                RewriteStyle.isPlausibleCleanup(original: spoken, cleaned: polished) {
                 text = polished
             } else {

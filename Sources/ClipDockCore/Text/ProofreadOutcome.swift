@@ -19,7 +19,7 @@ public enum ProofreadOutcome: Equatable, Sendable {
         // "ok" → "Okay.").
         let difference = abs(fixed.count - core.count)
         guard difference <= max(12, core.count * 3 / 10) else { return .implausible }
-        guard abs(RewriteStyle.cyrillicShare(core) - RewriteStyle.cyrillicShare(fixed)) < 0.3 else { return .implausible }
+        guard RewriteStyle.sameAlphabet(core, fixed) else { return .implausible }
         let leading = original.prefix { $0.isWhitespace || $0.isNewline }
         let trailing = String(original.reversed().prefix { $0.isWhitespace || $0.isNewline }.reversed())
         return .corrected(leading + fixed + trailing)

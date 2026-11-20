@@ -13,7 +13,7 @@ enum SecretStore {
 
     static func add(_ value: String, account: String) throws {
         var query = match(account)
-        query[kSecAttrLabel] = "ClipDock saved secret"
+        query[kSecAttrLabel] = "Sputnik saved secret"
         query[kSecValueData] = Data(value.utf8)
         try check(SecItemAdd(query as CFDictionary, nil))
     }

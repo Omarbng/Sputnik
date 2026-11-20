@@ -82,8 +82,8 @@ extension PopupController {
             let state: RowTranslation.State
             do {
                 let source = isImage ? try await tools.images.recognizedText(in: item) : (item.text ?? "")
-                let direction = translation.direction(for: source)
-                label = isImage ? "Text in image · \(direction.label)" : direction.label
+                let direction = translation.direction(for: source)?.label ?? ""
+                label = isImage ? "Text in image · \(direction)" : direction
                 state = .done(try await translation.translate(source))
             } catch let failure as ImageTools.Failure {
                 state = .failed(ImageActions.message(for: failure))

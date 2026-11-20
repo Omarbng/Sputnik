@@ -13,9 +13,13 @@ final class TranslationService {
     static let progressDelay: Duration = .milliseconds(150)
 
     struct Hooks {
-        var needsLanguagePacks: () -> Void
+        /// The language files for this direction (and any other missing ones) need downloading.
+        var needsLanguagePacks: (TranslationDirection?) -> Void
         var needsAccessibility: () -> Void
     }
+
+    /// Text in the main language with no other language set up to translate it into.
+    struct NoTarget: Error {}
 
     private let translator: any Translator
     private let hud: HUDController
@@ -52,42 +56,52 @@ final class TranslationService {
 
     /// For ⌘T in the popup. The row shows progress, so there's no HUD.
     func translate(_ text: String) async throws -> String {
-        let direction = direction(for: text)
+        guard let direction = direction(for: text) else { throw NoTarget() }
         Log.translate.notice("row direction=\(direction.id, privacy: .public) chars=\(text.count, privacy: .public)")
         return try await translate(text, direction: direction)
     }
 
-    /// Into a language Omar named ("translate to Russian"). Text already in it comes back as is.
+    /// Into a language someone named ("translate to German"). Text already in it comes back as
+    /// is. Apple translates most pairs directly; the few it doesn't go through English.
     func translate(_ text: String, into target: TranslationLanguage) async throws -> String {
-        let source = LanguageDetector.language(of: text)
+        let setup = AppSettings.languages
+        let source = LanguageDetector.language(of: text, among: Array(Set(setup.all + [target])), main: setup.main)
         guard source != target else { return text }
-        guard source == .english || target == .english else {
-            // Apple translates through English for French ↔ Russian.
+        if source != .english, target != .english, !(await LanguagePacks.isSupported(TranslationDirection(source, to: target))) {
             let english = try await translate(text, direction: TranslationDirection(source, to: .english))
             return try await translate(english, direction: TranslationDirection(.english, to: target))
         }
         return try await translate(text, direction: TranslationDirection(source, to: target))
     }
 
-    /// French and Russian go into English. English goes into the conversation's language when
-    /// "Reply in their language" remembers one, otherwise into the language picked in Settings.
-    func direction(for text: String) -> TranslationDirection {
-        LanguageDetector.direction(for: text, englishTarget: englishTarget)
+    /// Other languages go into the main one. The main one goes into the conversation's language
+    /// when "Reply in their language" remembers one, otherwise into the one picked in Settings.
+    /// Nil when nothing else is set up.
+    func direction(for text: String) -> TranslationDirection? {
+        LanguageDetector.direction(for: text, setup: AppSettings.languages, target: currentTarget)
     }
 
-    /// Where English goes right now.
-    var englishTarget: TranslationLanguage {
-        let fallback = AppSettings.englishTarget
+    /// Where the main language goes right now.
+    var currentTarget: TranslationLanguage? {
+        let fallback = AppSettings.languages.target
         guard AppSettings.isOn(.replyInTheirLanguage) else { return fallback }
-        return reply.englishTarget(default: fallback, now: .now)
+        return reply.target(default: fallback, now: .now)
     }
 
     /// Every translation goes through here, so the reply language follows the conversation.
     private func translate(_ text: String, direction: TranslationDirection) async throws -> String {
-        let result = try await translator.translate(text, direction: direction)
-        reply.noteTranslation(from: direction.source, at: .now)
-        return result
+        do {
+            let result = try await translator.translate(text, direction: direction)
+            reply.noteTranslation(from: direction.source, main: AppSettings.languages.main, at: .now)
+            return result
+        } catch {
+            if LanguagePacks.isNotInstalled(error) { missingDirection = direction }
+            throw error
+        }
     }
+
+    /// The last direction that failed for want of its language files, for the download card.
+    private var missingDirection: TranslationDirection?
 
     /// Adds a translation to history with the "translated" badge.
     func record(_ translation: String, from app: NSRunningApplication?) {
@@ -103,8 +117,11 @@ final class TranslationService {
     /// A short message for `error`. Also offers the language download when that's the cause.
     func describe(_ error: Error) -> String {
         Log.translate.error("failed: \(String(describing: error), privacy: .public)")
+        if error is NoTarget {
+            return "Add a language to translate into in Settings → Translation"
+        }
         if LanguagePacks.isNotInstalled(error) {
-            hooks.needsLanguagePacks()
+            hooks.needsLanguagePacks(missingDirection)
             return "Download the language files first"
         }
         return "Translation failed"
@@ -132,8 +149,12 @@ final class TranslationService {
             Log.translate.notice("stopped reason=\(grabbed == .nothingCopied ? "nothingCopied" : "notText", privacy: .public)")
             return
         }
-        let direction = direction(for: text)
-        let isReply = direction.source == .english && direction.target != AppSettings.englishTarget
+        guard let direction = direction(for: text) else {
+            hud.show(describe(NoTarget()), style: .error)
+            return
+        }
+        let setup = AppSettings.languages
+        let isReply = direction.source == setup.main && direction.target != setup.target
         do {
             let translation = try await translateShowingProgress(text, direction: direction)
             card.show(
@@ -214,7 +235,7 @@ final class TranslationService {
     private func canReadSelection() -> Bool {
         guard AccessibilityAccess.isTrusted else {
             Log.translate.notice("stopped reason=noAccessibility")
-            hud.show("ClipDock needs Accessibility to read the selection", style: .error)
+            hud.show("Sputnik needs Accessibility to read the selection", style: .error)
             hooks.needsAccessibility()
             return false
         }

@@ -127,7 +127,7 @@ struct ProofreadOutcomeTests {
 struct ShortcutGuideTests {
     private func options(proofread: TapModifier? = .shift, dictation: Bool = true, sayLanguage: Bool = true) -> ShortcutGuide.Options {
         .init(popupTap: .option, translateTap: .control, proofreadTap: proofread, dictation: dictation,
-              rightOption: true, sayLanguage: sayLanguage, voiceCommands: true, englishTarget: .russian)
+              rightOption: true, sayLanguage: sayLanguage, voiceCommands: true, languages: .omar)
     }
 
     @Test("Shows the keys as set")

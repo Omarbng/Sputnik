@@ -1,4 +1,5 @@
 import AppKit
+import ClipDockCore
 
 /// Shows the language download card and closes it once every direction is installed.
 @MainActor
@@ -14,13 +15,19 @@ final class LanguagePackCardController {
         card.onClose = { [weak self] in self?.stopWatching() }
     }
 
+    /// Directions asked for outside the setup (a voice command into another language).
+    private var extra: [TranslationDirection] = []
+
     func refreshStatus() async {
-        isMissing = !(await LanguagePacks.missingDirections()).isEmpty
+        isMissing = !(await LanguagePacks.missingDirections(extra: extra)).isEmpty
     }
 
-    func show() {
+    /// `direction` adds a pair the setup doesn't cover.
+    func show(adding direction: TranslationDirection? = nil) {
+        if let direction, !extra.contains(direction) { extra.append(direction) }
         guard !card.isShowing else { return }
-        card.show(LanguagePackCardView(onDismiss: { [card] in card.close() }))
+        let extra = extra
+        card.show(LanguagePackCardView(extra: extra, onDismiss: { [card] in card.close() }))
         startWatching()
     }
 

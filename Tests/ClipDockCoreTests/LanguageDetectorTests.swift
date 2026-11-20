@@ -79,6 +79,6 @@ struct LanguageDetectorTests {
     func labels() {
         #expect(TranslationDirection.frenchToEnglish.label == "FR → EN")
         #expect(TranslationDirection.englishToRussian.id == "en-ru")
-        #expect(Set(TranslationDirection.all).count == 4)
+        #expect(Set(LanguageSetup.omar.directions).count == 4)
     }
 }

@@ -23,7 +23,7 @@ final class SelectionProofreader {
     func proofreadSelection() {
         guard !isBusy else { return }
         guard AccessibilityAccess.isTrusted else {
-            hud.show("ClipDock needs Accessibility to read the selection", style: .error)
+            hud.show("Sputnik needs Accessibility to read the selection", style: .error)
             needsAccessibility()
             return
         }

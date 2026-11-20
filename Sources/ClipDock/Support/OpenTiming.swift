@@ -24,7 +24,7 @@ struct OpenTiming {
             let ms = (ContinuousClock.now - start) / .milliseconds(1)
             Log.popup.notice("open ms=\(ms, format: .fixed(precision: 1), privacy: .public)")
             #if DEBUG
-            print(String(format: "ClipDock popup open: %.1f ms", ms))
+            print(String(format: "Sputnik popup open: %.1f ms", ms))
             #endif
         }
     }

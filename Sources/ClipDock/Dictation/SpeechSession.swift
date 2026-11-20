@@ -2,9 +2,10 @@ import AVFoundation
 import ClipDockCore
 import Speech
 
-/// One dictation's recognition, with Apple's on-device recognisers: `SpeechTranscriber` for
-/// English and `DictationTranscriber` for Russian (Apple's new model has no Russian). With both
-/// languages on, both listen and `TranscriptPicker` keeps the one that understood.
+/// One dictation's recognition, with Apple's on-device recognisers: `SpeechTranscriber` where
+/// Apple's newer model has the language (English, French, German, Spanish …), otherwise
+/// `DictationTranscriber` (Russian, Dutch, Turkish …). With several languages on, all listen and
+/// `TranscriptPicker` keeps the one that understood.
 @MainActor
 final class SpeechSession {
     private let analyzer: SpeechAnalyzer
@@ -29,21 +30,8 @@ final class SpeechSession {
     static func make(languages: [TranslationLanguage], vocabulary: [String]) async throws -> SpeechSession {
         var modules: [(TranslationLanguage, any SpeechModule)] = []
         for language in languages {
-            switch language {
-            case .english:
-                modules.append((language, SpeechTranscriber(
-                    locale: Locale(identifier: "en_US"), transcriptionOptions: [],
-                    reportingOptions: [], attributeOptions: [.transcriptionConfidence]
-                )))
-            case .russian:
-                modules.append((language, DictationTranscriber(
-                    locale: Locale(identifier: "ru_RU"), contentHints: [],
-                    transcriptionOptions: [.punctuation], reportingOptions: [.volatileResults],
-                    attributeOptions: [.transcriptionConfidence]
-                )))
-            case .french:
-                continue  // Omar doesn't dictate in French (2026-11-19)
-            }
+            guard let recogniser = await SpeechLanguages.recogniser(for: language) else { continue }
+            modules.append((language, recogniser.module()))
         }
         guard !modules.isEmpty else { throw Problem.noLanguage }
         let speechModules = modules.map(\.1)
@@ -135,38 +123,85 @@ final class SpeechSession {
     }
 }
 
-/// Which dictation languages are on this Mac, and Apple's download for a missing one.
+/// Which recogniser serves each language, whether it's on this Mac, and Apple's download.
+@MainActor
 enum SpeechLanguages {
-    static func isInstalled(_ language: TranslationLanguage) async -> Bool {
-        switch language {
-        case .english:
-            await SpeechTranscriber.installedLocales.contains { $0.identifier(.bcp47).hasPrefix("en-US") || $0.identifier == "en_US" }
-        case .russian:
-            await DictationTranscriber.installedLocales.contains { $0.identifier(.bcp47).hasPrefix("ru") }
-        case .french:
-            false
+    struct Recogniser {
+        enum Engine { case speech, dictation }
+        let locale: Locale
+        let engine: Engine
+
+        func module() -> any SpeechModule {
+            switch engine {
+            case .speech:
+                SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [], attributeOptions: [.transcriptionConfidence])
+            case .dictation:
+                DictationTranscriber(
+                    locale: locale, contentHints: [], transcriptionOptions: [.punctuation],
+                    reportingOptions: [.volatileResults], attributeOptions: [.transcriptionConfidence]
+                )
+            }
+        }
+
+        /// The smaller set of models to download.
+        func downloadModule() -> any SpeechModule {
+            switch engine {
+            case .speech: SpeechTranscriber(locale: locale, preset: .transcription)
+            case .dictation: DictationTranscriber(locale: locale, preset: .shortDictation)
+            }
         }
     }
 
-    /// The languages dictation listens for, from Settings, limited to what's installed.
-    static func active() async -> [TranslationLanguage] {
-        let wanted: [TranslationLanguage] = switch AppSettings.dictationLanguage {
-        case .automatic: [.english, .russian]
-        case .english: [.english]
-        case .russian: [.russian]
+    /// The region each language is recognised in (Apple's recognisers need one).
+    private static let locales: [String: String] = [
+        "en": "en_US", "ru": "ru_RU", "fr": "fr_FR", "de": "de_DE", "es": "es_ES", "it": "it_IT",
+        "pt": "pt_BR", "nl": "nl_NL", "tr": "tr_TR", "ar": "ar_SA", "ja": "ja_JP", "ko": "ko_KR",
+        "zh": "zh_CN", "zh-TW": "zh_TW", "th": "th_TH", "vi": "vi_VN",
+    ]
+    private static var cache: [TranslationLanguage: Recogniser?] = [:]
+
+    /// Apple's newer `SpeechTranscriber` when it has the language, else `DictationTranscriber`;
+    /// nil when neither does (Hindi, Indonesian, Polish, Ukrainian).
+    static func recogniser(for language: TranslationLanguage) async -> Recogniser? {
+        if let cached = cache[language] { return cached }
+        var found: Recogniser?
+        if let identifier = locales[language.code] {
+            let wanted = Locale(identifier: identifier)
+            if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) {
+                found = Recogniser(locale: locale, engine: .speech)
+            } else if let locale = await DictationTranscriber.supportedLocale(equivalentTo: wanted) {
+                found = Recogniser(locale: locale, engine: .dictation)
+            }
         }
+        cache[language] = found
+        return found
+    }
+
+    static func canDictate(_ language: TranslationLanguage) async -> Bool {
+        await recogniser(for: language) != nil
+    }
+
+    static func isInstalled(_ language: TranslationLanguage) async -> Bool {
+        guard let recogniser = await recogniser(for: language) else { return false }
+        let wanted = recogniser.locale.identifier(.bcp47)
+        let installed = switch recogniser.engine {
+        case .speech: await SpeechTranscriber.installedLocales
+        case .dictation: await DictationTranscriber.installedLocales
+        }
+        return installed.contains { $0.identifier(.bcp47) == wanted }
+    }
+
+    /// The languages dictation listens for (from the setup), limited to what's installed.
+    static func active() async -> [TranslationLanguage] {
         var result: [TranslationLanguage] = []
-        for language in wanted where await isInstalled(language) { result.append(language) }
+        for language in AppSettings.languages.spoken where await isInstalled(language) { result.append(language) }
         return result
     }
 
-    /// Downloads Apple's recogniser for a language (Russian dictation is about a minute or two).
+    /// Downloads Apple's recogniser for a language (a minute or two).
     static func download(_ language: TranslationLanguage) async throws {
-        let module: any SpeechModule = switch language {
-        case .russian: DictationTranscriber(locale: Locale(identifier: "ru_RU"), preset: .shortDictation)
-        default: SpeechTranscriber(locale: Locale(identifier: "en_US"), preset: .transcription)
-        }
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
+        guard let recogniser = await recogniser(for: language) else { return }
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [recogniser.downloadModule()]) {
             try await request.downloadAndInstall()
         }
         Log.dictation.notice("language installed=\(language.code, privacy: .public)")

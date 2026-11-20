@@ -31,7 +31,7 @@ public struct CalendarEvent: Equatable, Sendable {
         [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//ClipDock//EN",
+            "PRODID:-//Sputnik//EN",
             "BEGIN:VEVENT",
             "UID:\(uid)",
             "DTSTAMP:\(Self.utc(now))",

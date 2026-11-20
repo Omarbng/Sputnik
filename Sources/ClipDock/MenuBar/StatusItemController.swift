@@ -41,7 +41,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let capturing = actions.hasClipboardAccess() && actions.pausedUntil() == nil
         let image = NSImage(
             systemSymbolName: capturing ? "doc.on.clipboard" : "clipboard",
-            accessibilityDescription: capturing ? "ClipDock" : "ClipDock (capture paused)"
+            accessibilityDescription: capturing ? "Sputnik" : "Sputnik (capture paused)"
         )
         image?.isTemplate = true
         statusItem.button?.image = image
@@ -59,7 +59,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
-        let open = item("Open ClipDock", #selector(openPopup))
+        let open = item("Open Sputnik", #selector(openPopup))
         open.setShortcut(for: .openPopup)
         if let tap = AppSettings.popupTap {
             open.subtitle = "Tap \(tap.symbol) \(tap.name) twice"
@@ -75,7 +75,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let settings = item("Settings…", #selector(openSettings))
         settings.keyEquivalent = ","
         menu.addItem(settings)
-        menu.addItem(withTitle: "Quit ClipDock", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Sputnik", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
     // MARK: Private

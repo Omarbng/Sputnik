@@ -36,6 +36,9 @@ enum AppSettings {
         // Added 2026-11-20 ("make it easier").
         static let rightOptionTalk = "dictationHoldRightOption"
         static let sayLanguage = "dictationSayLanguageFirst"
+        // Added 2026-11-20 (Sputnik: anyone's languages, first-launch setup).
+        static let languages = "languageSetup"
+        static let didCompleteSetup = "didCompleteSetup"
     }
 
     /// The on/off switches in Settings. Each is on unless Omar turns it off.
@@ -88,28 +91,44 @@ enum AppSettings {
         defaults.set(on, forKey: setting.key)
     }
 
-    /// Which language dictation listens for: both (it picks), or just one (faster, surer).
-    enum DictationLanguage: String, CaseIterable {
-        case automatic, english, russian
-
-        var label: String {
-            switch self {
-            case .automatic: "English or Russian (automatic)"
-            case .english: "English only"
-            case .russian: "Russian only"
+    /// The languages this person works in (chosen in the setup or Settings). Until then, a
+    /// guess from the Mac's own language.
+    static var languages: LanguageSetup {
+        get {
+            if let data = defaults.data(forKey: Key.languages),
+               let setup = try? JSONDecoder().decode(LanguageSetup.self, from: data) {
+                return setup
             }
+            return .suggested(preferredLanguages: Locale.preferredLanguages)
         }
-    }
-
-    static var dictationLanguage: DictationLanguage {
-        get { defaults.string(forKey: Key.dictationLanguage).flatMap(DictationLanguage.init(rawValue:)) ?? .automatic }
-        set { defaults.set(newValue.rawValue, forKey: Key.dictationLanguage) }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) { defaults.set(data, forKey: Key.languages) }
+        }
     }
 
     /// Names and words the recogniser should expect (the personal dictionary), one per line.
     static var dictationVocabulary: [String] {
         get { defaults.stringArray(forKey: Key.dictationVocabulary) ?? [] }
         set { defaults.set(newValue, forKey: Key.dictationVocabulary) }
+    }
+
+    /// The first-launch setup ran (or this Mac used ClipDock before the setup existed).
+    static var didCompleteSetup: Bool {
+        get { defaults.bool(forKey: Key.didCompleteSetup) }
+        set { defaults.set(newValue, forKey: Key.didCompleteSetup) }
+    }
+
+    /// Once, at launch: a Mac that ran ClipDock keeps its languages (English into Russian or
+    /// French, dictation from the old picker) and skips the setup.
+    static func migrateFromClipDockOnce() {
+        guard defaults.data(forKey: Key.languages) == nil else { return }
+        let legacy = [Key.didShowPasteAccessCard, Key.didShowAccessibilityCard, Key.englishTarget, Key.dictationLanguage, Key.popupTap]
+        guard legacy.contains(where: { defaults.object(forKey: $0) != nil }) else { return }
+        languages = .migrated(
+            englishTarget: defaults.string(forKey: Key.englishTarget),
+            dictation: defaults.string(forKey: Key.dictationLanguage)
+        )
+        didCompleteSetup = true
     }
 
     /// The modifier to double-tap to open the clipboard (default ⌥), or nil for off.
@@ -143,17 +162,6 @@ enum AppSettings {
             defaults.removeObject(forKey: "KeyboardShortcuts_" + name)
         }
         defaults.set(true, forKey: Key.didMigrateToDoubleTaps)
-    }
-
-    /// What English text is translated into: Russian (the default) or French.
-    static var englishTarget: TranslationLanguage {
-        get {
-            defaults.string(forKey: Key.englishTarget)
-                .flatMap(TranslationLanguage.init(rawValue:))
-                .flatMap { TranslationLanguage.englishTargets.contains($0) ? $0 : nil }
-                ?? TranslationLanguage.englishTargets[0]
-        }
-        set { defaults.set(newValue.rawValue, forKey: Key.englishTarget) }
     }
 
     static var ignoredBundleIDs: [String] {

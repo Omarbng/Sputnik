@@ -7,11 +7,11 @@ struct AccessibilityCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Let ClipDock use the keyboard", systemImage: "keyboard")
+            Label("Let Sputnik use the keyboard", systemImage: "keyboard")
                 .font(.headline)
-            Text("ClipDock needs the **Accessibility** permission for two things: noticing your double-tap shortcuts (⌥⌥ and ⌃⌃), and pressing ⌘V in the app you were using when you pick an item.")
-            Text("Without it, the shortcuts don't work, and ClipDock only copies items, so you press ⌘V yourself.")
-            Text("Click Continue, then turn on ClipDock in System Settings → Privacy & Security → Accessibility. This window closes by itself when that's done.")
+            Text("Sputnik needs the **Accessibility** permission for two things: noticing your double-tap shortcuts (⌥⌥ and ⌃⌃), and pressing ⌘V in the app you were using when you pick an item.")
+            Text("Without it, the shortcuts don't work, and Sputnik only copies items, so you press ⌘V yourself.")
+            Text("Click Continue, then turn on Sputnik in System Settings → Privacy & Security → Accessibility. This window closes by itself when that's done.")
                 .foregroundStyle(.secondary)
             HStack {
                 Spacer()

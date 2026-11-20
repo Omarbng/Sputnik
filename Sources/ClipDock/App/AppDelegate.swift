@@ -22,12 +22,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pasteStack: PasteStackController?
     private var dictation: DictationController?
     private var proofreader: SelectionProofreader?
+    private var setup: SetupWindowController?
     #if DEBUG
     private var debugHooks: DebugHooks?
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppSettings.removeOldComboShortcutsOnce()  // before KeyboardShortcuts reads them
+        AppSettings.migrateFromClipDockOnce()  // a Mac that ran ClipDock keeps its languages
         guard let database = openDatabase() else { return }
 
         let history = self.history
@@ -45,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             capture: capture,
             card: translationCard,
             hooks: .init(
-                needsLanguagePacks: { languageCard.show() },
+                needsLanguagePacks: { direction in languageCard.show(adding: direction) },
                 needsAccessibility: { accessibilityCard.show() }
             )
         )
@@ -77,12 +79,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let proofreader = SelectionProofreader(writing: writing, inserter: inserter, hud: hud) {
             accessibilityCard.show()
         }
+        let guide = self.guide
+        let setup = SetupWindowController(actions: .init(
+            allowKeyboard: { accessibilityCard.show() },
+            allowClipboard: { [weak capture] in pasteAccessCard.show(access: capture?.access ?? PasteboardAccess.behavior) },
+            downloadTranslation: { languageCard.show() },
+            openShortcuts: { guide.show() },
+            finished: { [weak dictation] in
+                Task { await languageCard.refreshStatus() }
+                dictation?.prewarm()
+                hud.show("Sputnik is ready — tap ⌥ twice")
+            }
+        ))
         let settings = SettingsWindowController(
             icons: icons,
             actions: .init(
                 openAccessibilitySettings: { accessibilityCard.show() },
                 openPasteSettings: { PasteboardAccess.openSettings() },
-                downloadLanguages: { languageCard.show() }
+                downloadLanguages: { languageCard.show() },
+                runSetup: { setup.show() }
             ),
             languagesMissing: { languageCard.isMissing }
         )
@@ -90,7 +105,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if limitsChanged { maintenance.applyRetention() }
         }
         popup.onOpenSettings = { settings.show() }
-        let guide = self.guide
         guide.onOpenSettings = { settings.show() }
 
         let statusItem = StatusItemController(actions: .init(
@@ -160,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.pasteStack = pasteStack
         self.dictation = dictation
         self.proofreader = proofreader
+        self.setup = setup
         #if DEBUG
         // Test-only remote control. Off unless launched with `open --env CLIPDOCK_DEBUG_HOOKS=1`,
         // because any local process could otherwise drive pastes through ClipDock's permissions.
@@ -168,7 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 popup: popup, translation: translation, card: translationCard,
                 settings: settings, maintenance: maintenance, capture: capture,
                 dictation: dictation, pasteStack: pasteStack, history: history, hud: hud,
-                proofreader: proofreader, guide: guide
+                proofreader: proofreader, guide: guide, setup: setup
             ))
         }
         #endif
@@ -178,7 +193,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             translateTap=\(AppSettings.translateTap?.rawValue ?? "off", privacy: .public) \
             proofreadTap=\(AppSettings.proofreadTap?.rawValue ?? "off", privacy: .public) \
             rightOptionTalk=\(AppSettings.isOn(.rightOptionTalk), privacy: .public) \
-            englishInto=\(AppSettings.englishTarget.code, privacy: .public) \
+            languages=\(AppSettings.languages.all.map(\.code).joined(separator: ","), privacy: .public) \
+            target=\(AppSettings.languages.target?.code ?? "none", privacy: .public) \
+            spoken=\(AppSettings.languages.spoken.map(\.code).joined(separator: ","), privacy: .public) \
             maxItems=\(AppSettings.maxUnpinnedItems, privacy: .public) \
             days=\(AppSettings.retentionDays, privacy: .public) \
             separator=\(AppSettings.pasteAllSeparator.rawValue, privacy: .public) \
@@ -218,7 +235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             Log.storage.error("cannot open history: \(error.localizedDescription, privacy: .public)")
             let alert = NSAlert()
-            alert.messageText = "ClipDock can't open its history"
+            alert.messageText = "Sputnik can't open its history"
             alert.informativeText = error.localizedDescription
             alert.runModal()
             NSApp.terminate(nil)
@@ -239,6 +256,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Each card appears on its own once. After that, the menu offers it while it's needed.
     /// Returns whether a card was shown, so the cards don't pile up.
     private func showOnboardingIfNeeded(access: NSPasteboard.AccessBehavior) -> Bool {
+        // A new Mac gets the setup, which covers the cards below and the language download.
+        if !AppSettings.didCompleteSetup, let setup {
+            AppSettings.didShowPasteAccessCard = true
+            AppSettings.didShowAccessibilityCard = true
+            AppSettings.didShowLanguageCard = true
+            setup.show()
+            return true
+        }
         if access != .alwaysAllow, !AppSettings.didShowPasteAccessCard {
             AppSettings.didShowPasteAccessCard = true
             pasteAccessCard.show(access: access)

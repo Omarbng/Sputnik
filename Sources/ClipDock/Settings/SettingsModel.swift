@@ -39,9 +39,6 @@ final class SettingsModel {
         }
     }
 
-    var englishTarget = AppSettings.englishTarget {
-        didSet { AppSettings.englishTarget = englishTarget }
-    }
     var separator = AppSettings.pasteAllSeparator {
         didSet { AppSettings.pasteAllSeparator = separator }
     }
@@ -51,9 +48,8 @@ final class SettingsModel {
 
     /// The feature switches (all on unless turned off).
     private(set) var switches: [AppSettings.Switch: Bool] = [:]
-    var dictationLanguage = AppSettings.dictationLanguage {
-        didSet { AppSettings.dictationLanguage = dictationLanguage }
-    }
+    /// Main, other and spoken languages (shared with the first-launch setup).
+    let languages = LanguagesModel()
     /// The personal dictionary, one word or name per line.
     var vocabulary = AppSettings.dictationVocabulary.joined(separator: "\n") {
         didSet {
@@ -65,10 +61,6 @@ final class SettingsModel {
     }
 
     private(set) var microphone = AVCaptureDevice.authorizationStatus(for: .audio)
-    private(set) var englishSpeechInstalled = true
-    private(set) var russianSpeechInstalled = true
-    private(set) var downloadingRussian = false
-    private(set) var downloadMessage: String?
     private(set) var writingProblem: String?
     /// macOS's own use of fn ("Press 🌐 key to …"); nil when it does nothing.
     private(set) var fnKeyConflict: String?
@@ -87,13 +79,12 @@ final class SettingsModel {
         maxItems = AppSettings.maxUnpinnedItems
         retentionDays = AppSettings.retentionDays
         separator = AppSettings.pasteAllSeparator
-        englishTarget = AppSettings.englishTarget
         ignoredApps = AppSettings.ignoredBundleIDs
         popupTap = AppSettings.popupTap
         translateTap = AppSettings.translateTap
         proofreadTap = AppSettings.proofreadTap
         switches = Dictionary(uniqueKeysWithValues: AppSettings.Switch.allCases.map { ($0, AppSettings.isOn($0)) })
-        dictationLanguage = AppSettings.dictationLanguage
+        languages.reload()
         vocabulary = AppSettings.dictationVocabulary.joined(separator: "\n")
         limitsChanged = false
         refreshStatus(languagesMissing: languagesMissing)
@@ -109,10 +100,6 @@ final class SettingsModel {
         fnKeyConflict = Self.fnKeyConflict()
         wisprFlowRunning = NSWorkspace.shared.runningApplications.contains {
             $0.bundleIdentifier?.hasPrefix("com.electron.wispr-flow") == true
-        }
-        Task {
-            englishSpeechInstalled = await SpeechLanguages.isInstalled(.english)
-            russianSpeechInstalled = await SpeechLanguages.isInstalled(.russian)
         }
     }
 
@@ -134,22 +121,6 @@ final class SettingsModel {
             }
         } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
             NSWorkspace.shared.open(url)
-        }
-    }
-
-    func downloadRussianSpeech() {
-        guard !downloadingRussian else { return }
-        downloadingRussian = true
-        downloadMessage = "Downloading from Apple…"
-        Task {
-            do {
-                try await SpeechLanguages.download(.russian)
-                russianSpeechInstalled = await SpeechLanguages.isInstalled(.russian)
-                downloadMessage = nil
-            } catch {
-                downloadMessage = "The download didn't finish. Try again later."
-            }
-            downloadingRussian = false
         }
     }
 
@@ -180,7 +151,7 @@ final class SettingsModel {
         do {
             try LaunchAtLogin.setEnabled(enabled)
             launchAtLoginMessage = LaunchAtLogin.needsApproval
-                ? "Approve ClipDock in System Settings → General → Login Items."
+                ? "Approve Sputnik in System Settings → General → Login Items."
                 : nil
         } catch {
             launchAtLoginMessage = "macOS didn't allow it: \(error.localizedDescription)"

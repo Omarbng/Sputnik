@@ -1,12 +1,12 @@
 #!/bin/zsh
-# Build ClipDock, assemble + sign the .app, install to ~/Applications, relaunch.
+# Build Sputnik (formerly ClipDock), assemble + sign the .app, install to ~/Applications, relaunch.
 # Usage: ./run.sh [debug|release]   (default: debug)
 set -euo pipefail
 
 cd "${0:A:h}"
 
 CONFIG="${1:-debug}"
-APP_NAME="ClipDock"
+APP_NAME="Sputnik"
 SIGN_IDENTITY="ClipDock Dev"          # self-signed, stable across rebuilds (see PROGRESS.md)
 INSTALL_DIR="$HOME/Applications"
 source ./swiftpm-env.sh
@@ -41,12 +41,14 @@ codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$STAGE"
 codesign --verify --strict "$STAGE"
 
 echo "==> installing to $INSTALL_DIR"
-if pgrep -x "$APP_NAME" >/dev/null; then
-  pkill -x "$APP_NAME" || true
-  for _ in {1..50}; do pgrep -x "$APP_NAME" >/dev/null || break; sleep 0.1; done
-fi
+for running in "$APP_NAME" ClipDock; do  # ClipDock: the app's name before 2026-11-20
+  if pgrep -x "$running" >/dev/null; then
+    pkill -x "$running" || true
+    for _ in {1..50}; do pgrep -x "$running" >/dev/null || break; sleep 0.1; done
+  fi
+done
 mkdir -p "$INSTALL_DIR"
-rm -rf "$INSTALL_DIR/$APP_NAME.app"
+rm -rf "${INSTALL_DIR:?}/$APP_NAME.app" "${INSTALL_DIR:?}/ClipDock.app"
 ditto "$STAGE" "$INSTALL_DIR/$APP_NAME.app"
 
 echo "==> launching"

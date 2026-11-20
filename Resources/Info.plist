@@ -5,21 +5,21 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
-	<string>ClipDock</string>
+	<string>Sputnik</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.omar.clipdock</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ClipDock</string>
+	<string>Sputnik</string>
 	<key>CFBundleDisplayName</key>
-	<string>ClipDock</string>
+	<string>Sputnik</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
@@ -27,9 +27,9 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ClipDock listens only while you hold fn to dictate. The audio stays on this Mac and is discarded right after it's turned into text.</string>
+	<string>Sputnik listens only while you hold fn to dictate. The audio stays on this Mac and is discarded right after it's turned into text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>ClipDock turns your dictation into text with Apple's on-device speech recognition.</string>
+	<string>Sputnik turns your dictation into text with Apple's on-device speech recognition.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

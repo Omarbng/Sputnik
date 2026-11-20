@@ -25,12 +25,12 @@ public enum ShortcutGuide {
         public var rightOption: Bool
         public var sayLanguage: Bool
         public var voiceCommands: Bool
-        public var englishTarget: TranslationLanguage
+        public var languages: LanguageSetup
 
         public init(
             popupTap: TapModifier?, translateTap: TapModifier?, proofreadTap: TapModifier?,
             dictation: Bool, rightOption: Bool, sayLanguage: Bool, voiceCommands: Bool,
-            englishTarget: TranslationLanguage
+            languages: LanguageSetup
         ) {
             self.popupTap = popupTap
             self.translateTap = translateTap
@@ -39,7 +39,7 @@ public enum ShortcutGuide {
             self.rightOption = rightOption
             self.sayLanguage = sayLanguage
             self.voiceCommands = voiceCommands
-            self.englishTarget = englishTarget
+            self.languages = languages
         }
     }
 
@@ -49,15 +49,19 @@ public enum ShortcutGuide {
 
     private static func voice(_ options: Options) -> Section {
         guard options.dictation else { return Section(title: "Talk", rows: []) }
+        let setup = options.languages
+        let spoken = ListFormatter.localizedString(byJoining: setup.spoken.map(\.name))
         var rows = [
             Row(keys: ["fn"], title: "Hold fn and talk",
-                detail: "Let go and it's typed where you are, in English or Russian."
+                detail: "Let go and it's typed where you are" + (spoken.isEmpty ? "." : ", in \(spoken).")
                     + (options.rightOption ? " Holding right ⌥ works too." : "")),
             Row(keys: ["fn", "fn"], title: "Talk without holding",
                 detail: "Tap fn twice. fn again finishes, esc cancels."),
-            Row(keys: ["fn", "⇧"], title: "Talk in English, type in \(options.englishTarget.name)",
-                detail: "Tap ⇧ once while talking (the dots turn blue). Russian comes out in English."),
         ]
+        if let target = setup.target {
+            rows.append(Row(keys: ["fn", "⇧"], title: "Talk in \(setup.main.name), type in \(target.name)",
+                            detail: "Tap ⇧ once while talking (the dots turn blue). Other languages come out in \(setup.main.name)."))
+        }
         if options.sayLanguage {
             rows.append(Row(keys: ["fn", "⇧"], title: "Say the language first",
                             detail: "Start with “in French”, “in Russian” or “по-английски”. Those words aren't typed."))

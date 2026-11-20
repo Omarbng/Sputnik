@@ -45,6 +45,11 @@ final class WritingAssistant {
         try await respond(to: style.prompt(for: text), original: text, label: style.rawValue)
     }
 
+    /// Punctuation, fillers and self-corrections, in the language it was dictated in.
+    func polishDictation(_ text: String, language: TranslationLanguage) async throws -> String {
+        try await respond(to: RewriteStyle.dictationPrompt(for: text, language: language), original: text, label: "dictation-\(language.code)")
+    }
+
     /// A spoken instruction ("make it sound more confident") applied to a selection.
     func apply(instruction: String, to text: String) async throws -> String {
         try await respond(to: RewriteStyle.prompt(instruction: instruction, text: text), original: text, label: "instruction")

@@ -27,7 +27,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         if window == nil {
             let controller = NSHostingController(rootView: SettingsView(model: model, icons: icons, actions: actions))
             let window = NSWindow(contentViewController: controller)
-            window.title = "ClipDock Settings"
+            window.title = "Sputnik Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.delegate = self

@@ -44,12 +44,7 @@ public enum VoiceCommand: Sendable, Equatable {
     }
 
     static func language(in words: [String]) -> TranslationLanguage? {
-        for word in words {
-            if word.hasPrefix("russian") || word.hasPrefix("русск") { return .russian }
-            if word.hasPrefix("english") || word.hasPrefix("английск") { return .english }
-            if word.hasPrefix("french") || word.hasPrefix("француз") { return .french }
-        }
-        return nil
+        TranslationLanguage.named(in: words)
     }
 
     /// Lowercased words without punctuation ("Insert, my Office address." → insert my office address).

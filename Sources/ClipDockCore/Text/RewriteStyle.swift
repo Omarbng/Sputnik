@@ -81,7 +81,31 @@ public enum RewriteStyle: String, CaseIterable, Sendable {
         guard before > 0, after > 0 else { return false }
         let ratio = Double(after) / Double(before)
         guard ratio >= 0.4 && ratio <= 1.5 else { return false }
-        return abs(cyrillicShare(original) - cyrillicShare(cleaned)) < 0.3
+        return sameAlphabet(original, cleaned)
+    }
+
+    /// True when the original's main alphabet keeps about the same share of the letters (a
+    /// Russian text must not come back in Latin letters, nor a Japanese one in English).
+    public static func sameAlphabet(_ original: String, _ edited: String) -> Bool {
+        let before = Script.counts(in: original), after = Script.counts(in: edited)
+        let beforeTotal = Double(before.values.reduce(0, +)), afterTotal = Double(after.values.reduce(0, +))
+        guard beforeTotal > 0, afterTotal > 0, let main = before.max(by: { $0.value < $1.value })?.key else { return true }
+        return abs(Double(before[main, default: 0]) / beforeTotal - Double(after[main, default: 0]) / afterTotal) < 0.3
+    }
+
+    /// The prompt for polishing a dictation in `language`. English and Russian have their own;
+    /// any other language gets a general one, told to stay in that language.
+    public static func dictationPrompt(for text: String, language: TranslationLanguage) -> String {
+        switch language {
+        case .english: return RewriteStyle.dictation.prompt(for: text)
+        case .russian: return RewriteStyle.dictationRussian.prompt(for: text)
+        default:
+            let name = language.name
+            return "The text below is \(name) dictation. Clean it up: add punctuation and capitalization, "
+                + "remove filler words and false starts, and apply the speaker's self-corrections. Keep every "
+                + "sentence, including greetings and thanks. Your reply must be in \(name), the same language "
+                + "as the text. Do not translate it.\n\nText:\n\(text)"
+        }
     }
 
     static func cyrillicShare(_ text: String) -> Double {

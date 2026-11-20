@@ -2,13 +2,15 @@ import ClipDockCore
 @preconcurrency import KeyboardShortcuts
 import SwiftUI
 
-/// Four tabs: General (shortcuts, launch, permissions), Clipboard, Translation, Dictation.
+/// Four tabs: General (shortcuts, launch, permissions), Clipboard, Translation (languages),
+/// Dictation.
 /// Every feature added on 2026-11-19 has its own switch, on by default.
 struct SettingsView: View {
     struct Actions {
         var openAccessibilitySettings: () -> Void
         var openPasteSettings: () -> Void
         var downloadLanguages: () -> Void
+        var runSetup: () -> Void
     }
 
     @Bindable var model: SettingsModel
@@ -46,6 +48,7 @@ struct SettingsView: View {
                     set: { model.setLaunchAtLogin($0) }
                 ))
                 if let message = model.launchAtLoginMessage { note(message) }
+                Button("Run Setup Again…", action: actions.runSetup)
             }
             Section("Permissions") {
                 statusRow("Accessibility", detail: "To paste with ⌘V, read selections, and watch fn",
@@ -91,7 +94,7 @@ struct SettingsView: View {
                     Button("Add App…") { model.addIgnoredApp() }
                     Button("Restore Defaults") { model.restoreDefaultIgnoredApps() }
                 }
-                note("ClipDock never saves what you copy in these apps.")
+                note("Sputnik never saves what you copy in these apps.")
             }
         }
         .formStyle(.grouped)
@@ -99,19 +102,19 @@ struct SettingsView: View {
 
     private var translation: some View {
         Form {
+            Section("Your languages") {
+                TranslationLanguageRows(languages: model.languages)
+                note("Every other language translates into \(model.languages.setup.main.name). Apple translates on this Mac; nothing is sent anywhere.")
+            }
             Section("Translation") {
-                Picker("Translate English into", selection: $model.englishTarget) {
-                    ForEach(TranslationLanguage.englishTargets, id: \.self) { Text($0.name).tag($0) }
-                }
-                note("French and Russian always translate into English.")
                 switchRow(.replyInTheirLanguage, "Reply in their language",
-                          "After you translate a French or Russian message, your English goes back into that language for the next hour.")
+                          "After you translate a message from another language, your \(model.languages.setup.main.name) goes back into that language for the next hour.")
                 switchRow(.translateClipboard, "Translate the clipboard when nothing is selected",
                           "Double-tap ⌃ with nothing selected translates what you just copied, such as a WhatsApp message (right-click → Copy, then ⌃⌃).")
             }
-            Section("Languages") {
-                statusRow("Translation languages", detail: "English, Russian and French, on this Mac",
-                          ok: model.languagesInstalled, button: "Download…", action: actions.downloadLanguages)
+            Section("Language files") {
+                statusRow("Translation languages", detail: "Downloaded from Apple once, then offline",
+                          ok: !model.languages.translationFilesMissing, button: "Download…", action: actions.downloadLanguages)
             }
         }
         .formStyle(.grouped)
@@ -124,18 +127,19 @@ struct SettingsView: View {
                           "Hold fn, speak, let go: the text is typed where you are. Double-tap fn for hands-free (fn again to finish, Esc to cancel). Tap ⇧ while talking to type it translated.")
                 switchRow(.rightOptionTalk, "Hold right ⌥ to dictate too",
                           "Works like fn, for keyboards without it or if it's easier to reach. A quick tap (⌥⌥) and ⌥ with a letter still work as usual.")
-                Picker("Language", selection: $model.dictationLanguage) {
-                    ForEach(AppSettings.DictationLanguage.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
                 switchRow(.dictationRules, "Remove filler words, handle “new line”",
-                          "Drops um, uh, эм; “new line” / “новая строка” and “new paragraph” / “новый абзац” become line breaks.")
+                          "Drops um, uh, эм; “new line” / “новая строка” and “new paragraph” / “новый абзац” become line breaks (English and Russian).")
                 switchRow(.dictationPolish, "Polish with Apple Intelligence",
-                          "Fixes punctuation, false starts and self-corrections (“at three, actually four” → “at four”), in English and Russian. On this Mac; adds about half a second. A result that changes language or length too much is thrown away.")
+                          "Fixes punctuation, false starts and self-corrections (“at three, actually four” → “at four”). On this Mac; adds about half a second. A result that changes language or length too much is thrown away.")
                 if let problem = model.writingProblem, model.isOn(.dictationPolish) { warning(problem) }
                 switchRow(.sayLanguage, "Say the language first",
-                          "When translating (fn + ⇧), start with “in French”, “in Russian” or “in English” (or “по-французски”, “на английском”) to pick the language just this once. Those words aren't typed.")
+                          "When translating (fn + ⇧), start with “in French”, “in German”, “in English” (or “по-французски”, “на английском”) to pick the language just this once. Those words aren't typed.")
                 switchRow(.voiceCommands, "Voice commands",
                           "Select text, hold fn, tap ⌃ and say “translate to Russian”, “make it shorter”, “proofread” or anything else. Say “insert <name>” to paste a saved item.")
+            }
+            Section("Languages you speak") {
+                SpokenLanguageRows(languages: model.languages)
+                note("Up to \(LanguageSetup.maxSpoken). They all listen at once and Sputnik keeps the one that understood; fewer is faster. Add languages in the Translation tab.")
             }
             Section("Personal dictionary") {
                 TextEditor(text: $model.vocabulary)
@@ -146,14 +150,6 @@ struct SettingsView: View {
             Section("Status") {
                 statusRow("Microphone", detail: "Asked the first time you hold fn",
                           ok: model.microphone == .authorized, button: "Allow…", action: model.allowMicrophone)
-                statusRow("English speech", detail: "Apple's on-device recogniser",
-                          ok: model.englishSpeechInstalled, button: "", action: {})
-                HStack {
-                    statusRow("Russian speech", detail: model.downloadMessage ?? "Apple's on-device recogniser",
-                              ok: model.russianSpeechInstalled, button: model.downloadingRussian ? "" : "Download…",
-                              action: model.downloadRussianSpeech)
-                    if model.downloadingRussian { ProgressView().controlSize(.small) }
-                }
                 if let conflict = model.fnKeyConflict {
                     HStack {
                         warning("\(conflict). In Keyboard settings, set “Press 🌐 key to” to “Do Nothing”.")

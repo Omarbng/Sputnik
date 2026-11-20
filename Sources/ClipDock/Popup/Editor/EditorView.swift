@@ -87,7 +87,7 @@ struct EditorView: View {
     }
 
     private var secretNote: String {
-        let base = "Kept in the macOS Keychain, never in ClipDock's history. Touch ID is needed to paste or copy it."
+        let base = "Kept in the macOS Keychain, never in Sputnik's history. Touch ID is needed to paste or copy it."
         return state.mode == .new ? base : "Type a new value, or leave it empty to keep the current one. " + base
     }
 

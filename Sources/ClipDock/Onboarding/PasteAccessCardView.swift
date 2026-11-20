@@ -13,10 +13,10 @@ struct PasteAccessCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Let ClipDock see what you copy", systemImage: "doc.on.clipboard")
+            Label("Let Sputnik see what you copy", systemImage: "doc.on.clipboard")
                 .font(.headline)
-            Text("ClipDock keeps a history of what you copy so you can paste it again. Everything stays on this Mac.")
-            Text("macOS asks before an app reads the clipboard. Unless ClipDock is set to **Allow**, you'd see that prompt every time you copy, so capture stays off until then.")
+            Text("Sputnik keeps a history of what you copy so you can paste it again. Everything stays on this Mac.")
+            Text("macOS asks before an app reads the clipboard. Unless Sputnik is set to **Allow**, you'd see that prompt every time you copy, so capture stays off until then.")
             Text(steps)
                 .foregroundStyle(.secondary)
             HStack {
@@ -39,9 +39,9 @@ struct PasteAccessCardView: View {
 
     private var steps: String {
         if needsFirstPrompt {
-            "Click Continue. macOS asks once whether ClipDock may paste from other apps. Allow it, and this card moves to the next step."
+            "Click Continue. macOS asks once whether Sputnik may paste from other apps. Allow it, and this card moves to the next step."
         } else {
-            "In System Settings → Privacy & Security → Paste from Other Apps, set ClipDock to Allow. This window closes by itself when that's done."
+            "In System Settings → Privacy & Security → Paste from Other Apps, set Sputnik to Allow. This window closes by itself when that's done."
         }
     }
 }

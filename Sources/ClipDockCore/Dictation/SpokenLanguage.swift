@@ -12,15 +12,18 @@ public enum SpokenLanguage {
         public let rest: String
     }
 
-    // "in French", "translate to Russian", "translate into English", optionally followed by a
-    // comma, colon, dash or full stop. A bare "to French …" is too often an ordinary sentence.
+    // "in French", "translate to German", "translate into English" (any language Apple
+    // translates), optionally followed by a comma, colon, dash or full stop. A bare "to French …"
+    // is too often an ordinary sentence.
     private static let englishLeadIn = try! NSRegularExpression(
-        pattern: #"^\s*(?:in|(?:please\s+)?translate\s+(?:in|into|to))\s+(english|russian|french)(?!\p{L})[\s,.:;!\-–—]*"#,
+        pattern: #"^\s*(?:in|(?:please\s+)?translate\s+(?:in|into|to))\s+((?:traditional\s+|simplified\s+)?(?:"#
+            + TranslationLanguage.englishNamePattern + #"))(?!\p{L})[\s,.:;!\-–—]*"#,
         options: [.caseInsensitive]
     )
-    // "по-французски", "по английски", "на русском", "на английский", "переведи на французский".
+    // "по-французски", "по немецки", "на русском", "на английский", "переведи на испанский".
     private static let russianLeadIn = try! NSRegularExpression(
-        pattern: #"^\s*(?:переведи(?:те)?\s+)?(?:по[\s\-‐]*(английски|русски|французски)|на\s+(английск|русск|французск)\p{L}*)(?!\p{L})[\s,.:;!\-–—]*"#,
+        pattern: #"^\s*(?:переведи(?:те)?\s+)?(?:по[\s\-‐]*((?:"# + TranslationLanguage.russianStemPattern
+            + #")и)|на\s+((?:"# + TranslationLanguage.russianStemPattern + #")\p{L}*))(?!\p{L})[\s,.:;!\-–—]*"#,
         options: [.caseInsensitive]
     )
 
@@ -35,7 +38,7 @@ public enum SpokenLanguage {
                   let end = Range(match.range, in: text)?.upperBound
             else { continue }
             let rest = text[end...].trimmingCharacters(in: .whitespacesAndNewlines)
-            if !rest.isEmpty, LanguageDetector.language(of: rest) == language { return nil }
+            if !rest.isEmpty, LanguageDetector.language(of: rest, among: TranslationLanguage.catalog, main: language) == language { return nil }
             return Split(language: language, rest: rest.prefix(1).uppercased() + rest.dropFirst())
         }
         return nil
@@ -44,10 +47,8 @@ public enum SpokenLanguage {
     private static func language(in match: NSTextCheckingResult, of text: String) -> TranslationLanguage? {
         for group in 1..<match.numberOfRanges {
             guard let range = Range(match.range(at: group), in: text) else { continue }
-            let word = text[range].lowercased()
-            if word.hasPrefix("english") || word.hasPrefix("англ") { return .english }
-            if word.hasPrefix("russian") || word.hasPrefix("русск") { return .russian }
-            if word.hasPrefix("french") || word.hasPrefix("француз") { return .french }
+            let words = text[range].lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+            if let language = TranslationLanguage.named(in: words) { return language }
         }
         return nil
     }

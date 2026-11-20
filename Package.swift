@@ -10,6 +10,11 @@ let cltFrameworks = "/Library/Developer/CommandLineTools/Library/Developer/Frame
 let package = Package(
     name: "ClipDock",
     platforms: [.macOS(.v26)],
+    products: [
+        // The app is called Sputnik (renamed from ClipDock on 2026-11-20); the targets keep
+        // their original names.
+        .executable(name: "Sputnik", targets: ["ClipDock"]),
+    ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.12.0"),
         .package(path: "Vendor/KeyboardShortcuts"),  // KeyboardShortcuts 2.4.0, vendored (see its Package.swift)

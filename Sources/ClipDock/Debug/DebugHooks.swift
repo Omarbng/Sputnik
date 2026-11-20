@@ -47,6 +47,7 @@ import ClipDockCore
 ///   rightOption {text: down|up|click}  right ⌥ as the talk key, fed to the monitor directly
 ///   proofread                      same as the proofread shortcut (double-tap ⇧)
 ///   guide / guideClose / guideSnapshot {text: path}  the Shortcuts window
+///   setup {text: welcome|languages|permissions|ready} / setupClose / setupSnapshot {text: path}
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
@@ -58,7 +59,7 @@ final class DebugHooks {
     private static let needsTestTarget: Set<String> = [
         "toggle", "dock", "translate", "card", "postDoubleTap", "key", "action", "editor", "fieldCommand", "rowActions",
         "postKey", "postText", "postMouse", "openSettings", "clearHistoryNow", "dictateFile", "fn", "stack", "hud",
-        "proofread", "rightOption", "guide",
+        "proofread", "rightOption", "guide", "setup",
     ]
     /// Posted keys and clicks must land in the popup itself.
     private static let needsPopupKey: Set<String> = ["postKey", "postText", "postMouse"]
@@ -76,6 +77,7 @@ final class DebugHooks {
         let hud: HUDController
         let proofreader: SelectionProofreader
         let guide: GuideWindowController
+        let setup: SetupWindowController
     }
 
     init(targets: Targets) {
@@ -231,6 +233,11 @@ final class DebugHooks {
         observe("proofread") { _ in targets.proofreader.proofreadSelection() }
         observe("guide") { _ in targets.guide.show() }
         observe("guideClose") { _ in targets.guide.close() }
+        observe("setup") { info in targets.setup.show(step: info.text ?? "welcome") }
+        observe("setupClose") { _ in targets.setup.close() }
+        observe("setupSnapshot") { info in
+            if let path = info.text { targets.setup.snapshot(to: path) }
+        }
         observe("guideSnapshot") { info in
             if let path = info.text { targets.guide.snapshot(to: path) }
         }
