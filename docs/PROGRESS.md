@@ -611,8 +611,9 @@ shared mostly with office colleagues), "Start" on the setup with language choice
   builds `tour.gif`; JPEG, 1.8 MB in all. Every image was checked by eye for real data.
 - The same run re-checked Russian after the recogniser fix: Russian dictation, Russian typed as
   English, and "По-французски, …" all passed; both recognisers prewarm.
-- The download button and the install command need the v0.2.0 release on GitHub (not published
-  yet: it needs Omar's go-ahead).
+- **Released v0.2.0** (Omar: "publish", 2026-11-20 17:10): https://github.com/Omarbng/Sputnik/releases/tag/v0.2.0,
+  `Sputnik-0.2.0.dmg` rebuilt from commit 7e2d927, SHA-256 `385aa97e…e8f5`. The download button
+  and the installer's URL lookup resolve to it, and the downloaded file matches the build.
 
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
