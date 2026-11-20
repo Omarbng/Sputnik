@@ -583,9 +583,13 @@ shared mostly with office colleagues), "Start" on the setup with language choice
   app is in front or any hook is refused.
 - **Release:** `./release.sh` → `dist/Sputnik-0.2.0.dmg` (3.2 MB): Sputnik.app (signature
   verified, no debug hooks in the release build) plus an Applications shortcut.
-- **Before the first public push:** every commit's author line carries Omar's work email. Start
-  the public repo from a fresh history (or rewrite authors) with a GitHub noreply address; Omar
-  decides, since he handles GitHub.
+- **Published to https://github.com/Omarbng/Sputnik (public), 2026-11-20, at Omar's request.**
+  The 27 commits' author and committer emails were rewritten to his GitHub noreply address
+  (`272804488+Omarbng@users.noreply.github.com`) before the push, so his work email isn't public;
+  files and dates are unchanged (same tree). This repo's local git config uses that address for
+  new commits. The pre-rewrite history is in a local backup bundle (not pushed). Pushes go as
+  the Omarbng account (the Mac's active `gh` account is a different one). The v0.2.0 release
+  (the .dmg) isn't published yet: that needs Omar's go-ahead.
 - Not covered yet: native-language lead-ins other than English and Russian ("auf Englisch"),
   filler words outside English and Russian, region choice for dictation (English is en-US).
 
