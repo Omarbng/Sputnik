@@ -161,16 +161,19 @@ enum SpeechLanguages {
     private static var cache: [TranslationLanguage: Recogniser?] = [:]
 
     /// Apple's newer `SpeechTranscriber` when it has the language, else `DictationTranscriber`;
-    /// nil when neither does (Hindi, Indonesian, Polish, Ukrainian).
+    /// nil when neither does (Hindi, Indonesian, Polish, Ukrainian). Checked against each
+    /// engine's `supportedLocales`: `supportedLocale(equivalentTo:)` answers ru_RU for
+    /// SpeechTranscriber, which has no Russian (2026-11-20, macOS 26.0).
     static func recogniser(for language: TranslationLanguage) async -> Recogniser? {
         if let cached = cache[language] { return cached }
         var found: Recogniser?
         if let identifier = locales[language.code] {
             let wanted = Locale(identifier: identifier)
-            if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) {
-                found = Recogniser(locale: locale, engine: .speech)
-            } else if let locale = await DictationTranscriber.supportedLocale(equivalentTo: wanted) {
-                found = Recogniser(locale: locale, engine: .dictation)
+            let bcp47 = wanted.identifier(.bcp47)
+            if await SpeechTranscriber.supportedLocales.contains(where: { $0.identifier(.bcp47) == bcp47 }) {
+                found = Recogniser(locale: wanted, engine: .speech)
+            } else if await DictationTranscriber.supportedLocales.contains(where: { $0.identifier(.bcp47) == bcp47 }) {
+                found = Recogniser(locale: wanted, engine: .dictation)
             }
         }
         cache[language] = found
