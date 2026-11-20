@@ -523,6 +523,20 @@ All four ideas from the guide Claude wrote him, each with a switch (or an Off ch
   dictating, so tapping ⇧ or ⌃ to pick a mode can't also trigger ⇧⇧ or ⌃⌃.
 - Unit tests: `EasierShortcutsTests` (lead-ins, right-⌥ gate, hands-free, proofread outcome,
   guide). 156 tests in 37 suites pass.
+- **Cursor fix (same day):** Omar said keys "don't respond in Cursor or Chrome". Logs showed the
+  keys arrive (⌥⌥ opened the popup in both); what failed were three fn + ⌃ commands in Cursor at
+  13:38 that couldn't read the selection (the same command worked in WhatsApp). A ⌘C/⌘V sent
+  while ⌃ or ⇧ is still held reaches the app with them added (⇧⌘V is Cursor's Markdown preview),
+  so `KeySender.waitForModifierRelease` now waits (≤ 1.5 s) before every ⌘C and dictation ⌘V,
+  the copy wait is 600 ms (was 300), and "nothing copied" logs the app's bundle id.
+- **Live run (2026-11-20 15:36, test build, idle-gated, CDTarget window): 18/18 passed.**
+  "In French, see you tomorrow at the office." → "À demain au bureau." (lead-in not typed);
+  "По-французски, увидимся завтра в офисе." → "On se voit demain au bureau"; short clips
+  ("Thanks.", "Send it now.", "Да, отправь.") all typed; proofread hook "i has a apple and they is
+  red" → "I have an apple and they are red."; a real ⇧⇧ (posted ⇧ taps) → "The contract is
+  signed yesterday." (Apple's model left "is signed"); "All good here." left alone ("No mistakes
+  found"); a 0.1 s right-⌥ tap doesn't listen, a hold does, ⌥-click cancels with nothing typed;
+  the Shortcuts window renders in dark and light. Test rows removed by id; everyday build back.
 
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
