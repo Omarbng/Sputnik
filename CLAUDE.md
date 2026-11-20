@@ -1,6 +1,6 @@
 # ClipDock — build brief
 
-A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). Since 2026-11-19 it also does on-device dictation (hold fn, English and Russian), image text, and Apple Intelligence writing actions. It's a personal tool, so it isn't for the App Store or for sharing.
+A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). Since 2026-11-19 it also does on-device dictation (hold fn, English and Russian), image text, and Apple Intelligence writing actions. It's a personal tool, so it isn't for the App Store or for sharing. **Changed 2026-11-20 (Omar):** the goal is to keep building it every day and publish it on Omar's GitHub as a Mac app anyone can install and set up for their own languages. Until the release plan (name, signing, licence) is agreed, keep building for Omar, but don't hard-code his specifics in new code. Omar handles GitHub himself.
 
 **What matters most**
 
