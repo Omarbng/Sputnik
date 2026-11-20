@@ -13,8 +13,8 @@ A small menu-bar app for macOS. Everything runs on your Mac.
 ![MIT licence](https://img.shields.io/badge/licence-MIT-444?style=flat-square)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-  <img src="docs/images/hero-light.png" alt="Sputnik: clipboard history at the cursor, a translation card and the dictation bar" width="900">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.jpg">
+  <img src="docs/images/hero-light.jpg" alt="Sputnik: clipboard history at the cursor, a translation card and the dictation bar" width="900">
 </picture>
 
 </div>
@@ -54,12 +54,16 @@ microphone). To dictate with fn, set **System Settings → Keyboard → Press �
 
 <table>
   <tr>
-    <td><img src="docs/images/clipboard.png" alt="Clipboard history"></td>
-    <td><img src="docs/images/translate.png" alt="Translation card"></td>
+    <td><img src="docs/images/clipboard.jpg" alt="Clipboard history"></td>
+    <td><img src="docs/images/translate.jpg" alt="Translation card"></td>
   </tr>
   <tr>
-    <td><img src="docs/images/dictation.png" alt="The dictation bar"></td>
-    <td><img src="docs/images/actions.png" alt="The actions menu"></td>
+    <td><img src="docs/images/dictation.jpg" alt="The dictation bar"></td>
+    <td><img src="docs/images/actions.jpg" alt="The actions menu"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/quick-look.jpg" alt="Quick Look"></td>
+    <td><img src="docs/images/shortcuts.jpg" alt="The Shortcuts window"></td>
   </tr>
 </table>
 
@@ -83,7 +87,7 @@ Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Tha
 Ukrainian and Vietnamese. Dictation works in up to three at once (all except Hindi, Indonesian,
 Polish and Ukrainian, which Apple doesn't recognise yet).
 
-<p align="center"><img src="docs/images/setup.png" alt="The first-launch setup" width="800"></p>
+<p align="center"><img src="docs/images/setup.jpg" alt="The first-launch setup" width="800"></p>
 
 ## Private by design
 

@@ -596,6 +596,24 @@ shared mostly with office colleagues), "Start" on the setup with language choice
 - Not covered yet: native-language lead-ins other than English and Russian ("auf Englisch"),
   filler words outside English and Russian, region choice for dictation (English is en-US).
 
+## A clean, easy repository (2026-11-20, Omar: "make the repo clean and more easy to understand …")
+- **Layout:** `Sources/Sputnik`, `Sources/SputnikCore`, `Tests/SputnikCoreTests` (modules renamed
+  from ClipDock/ClipDockCore), `scripts/` (run, test, release, install; `dev/` test tools and the
+  screenshot composer), `docs/` (ARCHITECTURE, PROGRESS, DICTATION, images). The build brief
+  moved to `.claude/CLAUDE.md`. 169 tests pass after the move.
+- **README:** download button, one-command install (`scripts/install.sh`: latest release → the
+  .dmg → /Applications, no "Open Anyway" step), three-step manual install, keys table, a tour and
+  eight screenshots, languages, privacy, build steps.
+- **Screenshots:** made from the app itself with a made-up demo history (debug builds only:
+  `CLIPDOCK_DATA_DIR` points at a throwaway folder, the `seedDemo` hook fills it, capture is
+  paused during the run so nothing real gets in, `pillDemo` shows the dictation bar without the
+  microphone). `scripts/dev/compose-screenshots.swift` puts them on gradients with captions and
+  builds `tour.gif`; JPEG, 1.8 MB in all. Every image was checked by eye for real data.
+- The same run re-checked Russian after the recogniser fix: Russian dictation, Russian typed as
+  English, and "По-французски, …" all passed; both recognisers prewarm.
+- The download button and the install command need the v0.2.0 release on GitHub (not published
+  yet: it needs Omar's go-ahead).
+
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
   2026-11-18.** On a slow connection (~30 KB/s that day) SwiftPM's full clone of GRDB hung.

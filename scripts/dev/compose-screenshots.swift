@@ -93,9 +93,17 @@ func caption(_ c: CGContext, keys: String, text: String, at origin: CGPoint, siz
         .draw(at: CGPoint(x: cap.maxX + size * 0.6, y: cap.minY + size * 0.25))
 }
 
+/// Saved as JPEG (the backdrops are gradients, so PNG would be ten times larger), at most 1800
+/// pixels wide: sharp on a Retina screen at README size.
 func save(_ rep: NSBitmapImageRep, _ name: String) {
-    try? rep.representation(using: .png, properties: [:])?.write(to: output.appending(path: name))
-    print("wrote \(name)")
+    let file = name.replacingOccurrences(of: ".png", with: ".jpg")
+    let scale = min(1, 1800 / CGFloat(rep.pixelsWide))
+    let small = canvas(CGSize(width: (CGFloat(rep.pixelsWide) * scale).rounded(), height: (CGFloat(rep.pixelsHigh) * scale).rounded())) { c in
+        c.interpolationQuality = .high
+        if let image = rep.cgImage { c.draw(image, in: CGRect(x: 0, y: 0, width: c.width, height: c.height)) }
+    }
+    try? small.representation(using: .jpeg, properties: [.compressionFactor: 0.88])?.write(to: output.appending(path: file))
+    print("wrote \(file)")
 }
 
 // MARK: Hero (dark and light): the popup, the translation card and the dictation bar.
@@ -154,8 +162,10 @@ if let welcome = load("setup-welcome-dark"), let languages = load("setup-languag
     let size = CGSize(width: 2600, height: 1500)
     save(canvas(size) { c in
         backdrop(c, size, dark: true)
-        place(c, welcome, center: CGPoint(x: size.width * 0.28, y: size.height * 0.5), scale: 1.0, window: true)
-        place(c, languages, center: CGPoint(x: size.width * 0.72, y: size.height * 0.5), scale: 1.0, window: true)
+        // Same top edge (the pages differ in height).
+        let top = size.height / 2 + CGFloat(max(welcome.pixelsHigh, languages.pixelsHigh)) / 2
+        place(c, welcome, center: CGPoint(x: size.width * 0.28, y: top - CGFloat(welcome.pixelsHigh) / 2), scale: 1.0, window: true)
+        place(c, languages, center: CGPoint(x: size.width * 0.72, y: top - CGFloat(languages.pixelsHigh) / 2), scale: 1.0, window: true)
     }, "setup.png")
 }
 
