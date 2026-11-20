@@ -48,6 +48,8 @@ import ClipDockCore
 ///   proofread                      same as the proofread shortcut (double-tap ⇧)
 ///   guide / guideClose / guideSnapshot {text: path}  the Shortcuts window
 ///   setup {text: welcome|languages|permissions|ready} / setupClose / setupSnapshot {text: path}
+///   seedDemo                       fill a demo history (only with CLIPDOCK_DATA_DIR) with made-up items
+///   pillDemo {text: listening|working|hide, field: dictate|translate|command, seconds: level 0…1}
 @MainActor
 final class DebugHooks {
     private var tokens: [NSObjectProtocol] = []
@@ -78,6 +80,7 @@ final class DebugHooks {
         let proofreader: SelectionProofreader
         let guide: GuideWindowController
         let setup: SetupWindowController
+        let saved: SavedItems
     }
 
     init(targets: Targets) {
@@ -235,6 +238,24 @@ final class DebugHooks {
         observe("guideClose") { _ in targets.guide.close() }
         observe("setup") { info in targets.setup.show(step: info.text ?? "welcome") }
         observe("setupClose") { _ in targets.setup.close() }
+        observe("seedDemo") { _ in
+            guard ProcessInfo.processInfo.environment["CLIPDOCK_DATA_DIR"] != nil else {
+                Log.app.notice("debug seedDemo refused: not a demo history")
+                return
+            }
+            DemoContent.seed(capture: targets.capture, saved: targets.saved)
+        }
+        observe("pillDemo") { info in
+            let pill = targets.dictation.pill
+            switch info.text ?? "" {
+            case "hide": pill.hide()
+            default:
+                pill.state.mode = switch info.field { case "translate": .translate; case "command": .command; default: .dictate }
+                pill.state.phase = info.text == "working" ? .working : .listening
+                pill.state.level = Float(info.seconds ?? 0)
+                if !pill.isVisible { pill.show() }
+            }
+        }
         observe("setupSnapshot") { info in
             if let path = info.text { targets.setup.snapshot(to: path) }
         }

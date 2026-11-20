@@ -183,7 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 popup: popup, translation: translation, card: translationCard,
                 settings: settings, maintenance: maintenance, capture: capture,
                 dictation: dictation, pasteStack: pasteStack, history: history, hud: hud,
-                proofreader: proofreader, guide: guide, setup: setup
+                proofreader: proofreader, guide: guide, setup: setup, saved: saved
             ))
         }
         #endif
@@ -227,7 +227,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openDatabase() -> HistoryDatabase? {
         do {
-            let database = try HistoryDatabase(directory: AppPaths.supportDirectory())
+            var directory = try AppPaths.supportDirectory()
+            #if DEBUG
+            // Screenshots and demos: a separate history with made-up items, never the real one.
+            if let demo = ProcessInfo.processInfo.environment["CLIPDOCK_DATA_DIR"], !demo.isEmpty {
+                directory = URL(fileURLWithPath: demo, isDirectory: true)
+            }
+            #endif
+            let database = try HistoryDatabase(directory: directory)
             let expired = try database.applyRetention(AppSettings.retention, now: .now)
             history.replaceAll(with: try database.allItems())
             Log.storage.notice("history loaded items=\(self.history.items.count, privacy: .public) expired=\(expired.count, privacy: .public)")
