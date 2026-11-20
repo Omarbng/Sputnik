@@ -9,6 +9,25 @@ enum KeySender {
     static func commandV() { command(CGKeyCode(kVK_ANSI_V)) }
     static func commandC() { command(CGKeyCode(kVK_ANSI_C)) }
 
+    /// Keys Omar may still be holding when a dictation or shortcut finishes (fn + ⌃ for a
+    /// command, fn + ⇧ for a translation). A ⌘C or ⌘V sent meanwhile reaches the app with them
+    /// added: ⇧⌘V opens Cursor's Markdown preview instead of pasting, ⌃⌘C copies nothing.
+    private static let heldModifiers: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand, .maskSecondaryFn]
+
+    /// Waits until those keys are up (at most `timeout`). Returns false if they're still held.
+    @discardableResult
+    static func waitForModifierRelease(timeout: Duration = .milliseconds(1_500)) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !CGEventSource.flagsState(.hidSystemState).intersection(heldModifiers).isEmpty {
+            guard ContinuousClock.now < deadline else {
+                Log.paste.notice("modifiers still held; sending anyway")
+                return false
+            }
+            try? await Task.sleep(for: .milliseconds(15))
+        }
+        return true
+    }
+
     private static func command(_ key: CGKeyCode) {
         #if CLIPDOCK_TEST_BUILD
         // Test builds launched for scripts send keys only into the test target, checked right

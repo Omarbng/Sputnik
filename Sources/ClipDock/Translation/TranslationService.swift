@@ -4,8 +4,9 @@ import ClipDockCore
 /// Translation: the selected text in any app (double-tap ⌃ → card), and a popup row (⌘T).
 @MainActor
 final class TranslationService {
-    /// How long to wait for the target app to answer ⌘C.
-    static let copyTimeout: Duration = .milliseconds(300)
+    /// How long to wait for the target app to answer ⌘C. Electron apps (Cursor, Slack) can be
+    /// slower than native ones; the wait ends as soon as the copy arrives.
+    static let copyTimeout: Duration = .milliseconds(600)
     /// How long the target app gets to read the translation before the clipboard is restored.
     static let restoreDelay: Duration = .milliseconds(500)
     /// Translations faster than this show no "Translating…" HUD.

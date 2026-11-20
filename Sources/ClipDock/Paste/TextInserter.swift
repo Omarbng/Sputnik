@@ -33,6 +33,7 @@ final class TextInserter {
             hud.show(SecureInput.isEnabled ? "Can't type here — copied instead" : "Copied — press ⌘V", style: .error)
             return .copiedInstead
         }
+        await KeySender.waitForModifierRelease()  // fn + ⇧ still held would make it ⇧⌘V
         capture.beginIgnoringChanges()
         let snapshot = PasteboardSnapshot.take()
         PasteboardWriter.write(text: text)

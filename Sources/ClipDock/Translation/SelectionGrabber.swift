@@ -12,6 +12,7 @@ enum SelectionGrabber {
     }
 
     static func copySelection(timeout: Duration) async -> Result {
+        await KeySender.waitForModifierRelease()
         let pasteboard = NSPasteboard.general
         let before = pasteboard.changeCount
         KeySender.commandC()
@@ -30,6 +31,8 @@ enum SelectionGrabber {
             }
             return .notText
         }
+        // The app (bundle id only) helps tell "nothing selected" from "this app ignores ⌘C".
+        Log.paste.notice("copy: nothing copied app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?", privacy: .public)")
         return .nothingCopied
     }
 }
