@@ -570,6 +570,22 @@ shared mostly with office colleagues), "Start" on the setup with language choice
 - Unit tests: `LanguageSetupTests` (migration, suggestion, normalising, catalog, detection for
   German/Spanish/Japanese/Korean/Arabic/Ukrainian, voice commands and lead-ins in any language,
   same-alphabet picking, polish prompts). 169 tests in 40 suites pass.
+- **Live run (16:10, test build):** 9 of 12 passed. Accessibility kept after the rename,
+  ClipDock languages carried over (`languages=en,ru,fr target=ru spoken=en,ru`), no setup on the
+  upgraded Mac, English dictation, fn + ⌃ "translate to Russian", ⌃⌃ en→ru card, ⇧⇧, and all 8
+  setup pages rendered (dark and light). **Bug found:** only English prewarmed, so Russian
+  dictation came back empty: `SpeechTranscriber.supportedLocale(equivalentTo: ru_RU)` answers
+  ru_RU although that engine has no Russian. Fixed by checking each engine's
+  `supportedLocales`; after reinstalling at 16:15 the log shows `prewarmed languages=en,ru`. The
+  other two failures were the test-target guard refusing hooks: Omar came back (Finder, then
+  Spotify in front) at 16:10:50, and the burst kept relaunching the test window for ~90 s
+  before it finished. Nothing reached his apps. The burst's guard now stops as soon as another
+  app is in front or any hook is refused.
+- **Release:** `./release.sh` → `dist/Sputnik-0.2.0.dmg` (3.2 MB): Sputnik.app (signature
+  verified, no debug hooks in the release build) plus an Applications shortcut.
+- **Before the first public push:** every commit's author line carries Omar's work email. Start
+  the public repo from a fresh history (or rewrite authors) with a GitHub noreply address; Omar
+  decides, since he handles GitHub.
 - Not covered yet: native-language lead-ins other than English and Russian ("auf Englisch"),
   filler words outside English and Russian, region choice for dictation (English is en-US).
 
