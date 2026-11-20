@@ -7,7 +7,11 @@ cd "${0:A:h}"
 
 CONFIG="${1:-debug}"
 APP_NAME="Sputnik"
-SIGN_IDENTITY="ClipDock Dev"          # self-signed, stable across rebuilds (see PROGRESS.md)
+SIGN_IDENTITY="${SIGN_IDENTITY:-ClipDock Dev}"  # self-signed, stable across rebuilds (see PROGRESS.md)
+if ! security find-identity -p codesigning | grep -q "\"$SIGN_IDENTITY\""; then
+  echo "==> no \"$SIGN_IDENTITY\" certificate: signing ad hoc (permissions reset after each build)"
+  SIGN_IDENTITY="-"
+fi
 INSTALL_DIR="$HOME/Applications"
 source ./swiftpm-env.sh
 SWIFT_FLAGS=(-c "$CONFIG" "${SWIFTPM_COMMON_FLAGS[@]}")

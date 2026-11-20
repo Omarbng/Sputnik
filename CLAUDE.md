@@ -1,6 +1,9 @@
-# ClipDock — build brief
+# Sputnik (formerly ClipDock) — build brief
 
-A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). Since 2026-11-19 it also does on-device dictation (hold fn, English and Russian), image text, and Apple Intelligence writing actions. It's a personal tool, so it isn't for the App Store or for sharing. **Changed 2026-11-20 (Omar):** the goal is to keep building it every day and publish it on Omar's GitHub as a Mac app anyone can install and set up for their own languages. Until the release plan (name, signing, licence) is agreed, keep building for Omar, but don't hard-code his specifics in new code. Omar handles GitHub himself.
+**Renamed 2026-11-20 (Omar): the app is Sputnik.** Code targets, the bundle ID, the data folder
+and the Keychain service keep the old ClipDock names, so existing permissions and data carry over.
+
+A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has a single popup that opens at the mouse cursor. The popup holds clipboard history and offers translation between English, Russian and French as an action (French added 2026-11-18). Since 2026-11-19 it also does on-device dictation (hold fn, English and Russian), image text, and Apple Intelligence writing actions. It's a personal tool, so it isn't for the App Store or for sharing. **Changed 2026-11-20 (Omar):** the goal is to keep building it every day and publish it on Omar's GitHub as a Mac app anyone can install and set up for their own languages. Decided 2026-11-20: name **Sputnik**; **free signing** (Omar's self-signed certificate, so permissions survive updates; colleagues click "Open Anyway" once per download); **open source, MIT** (Claude's call; Omar shares it mostly with office colleagues). Any of Apple's 20 on-device languages can be chosen in a first-launch setup. Don't hard-code Omar's specifics in new code. Omar handles GitHub himself.
 
 **What matters most**
 
@@ -36,9 +39,10 @@ A tiny macOS menu-bar app for one person (Omar) on one Apple Silicon Mac. It has
 | Storage | [GRDB.swift](https://github.com/groue/GRDB.swift) (SQLite) in `~/Library/Application Support/ClipDock/`. Images and files go in a `blobs/` subfolder, named by content hash. |
 | Launch at login | `SMAppService.mainApp` |
 | Translation | Apple's **Translation** framework, which runs on the device. Claude API mode is optional and comes in M6. |
-| Language detection | If more than 30% of the letters are Cyrillic, the text is Russian. Otherwise `NLLanguageRecognizer`, limited to English, French and Russian, decides; French needs 60%+ confidence. Anything else counts as English. |
+| Language detection | ~~English/Russian/French only.~~ **Changed 2026-11-20:** among the person's chosen languages (`LanguageSetup`): a non-Latin script above 30% of the letters decides when one chosen language uses it (Cyrillic → Russian); otherwise `NLLanguageRecognizer`, limited to the chosen languages in that script, decides, and a language other than the main one needs 60%+ confidence. Unplaceable text counts as the main language. |
+| Languages (2026-11-20) | `TranslationLanguage.catalog`: Apple's 20 on-device translation languages. Each person picks a main language (everything translates into it), others, a target for the main one, and up to 3 spoken languages. Omar's (migrated): English main; Russian (target) and French; speaks English and Russian. |
 | Bundle id | `com.omar.clipdock`. Omar can change this. |
-| Dictation (2026-11-19) | Apple's on-device recognisers: `SpeechTranscriber` for English, `DictationTranscriber` for Russian (the new model has no Russian). Both listen; `TranscriptPicker` keeps the one that understood. No French dictation (Omar doesn't speak it). Parakeet/Whisper not added (no new dependency). |
+| Dictation (2026-11-19) | Apple's on-device recognisers: `SpeechTranscriber` where Apple's newer model has the language (English, French, German, Spanish, Italian, Portuguese, Japanese, Korean, Chinese, Arabic), else `DictationTranscriber` (Russian, Dutch, Turkish, Thai, Vietnamese); none for Hindi, Indonesian, Polish, Ukrainian. All spoken languages listen; `TranscriptPicker` keeps the one that understood. Omar doesn't dictate French. Parakeet/Whisper not added (no new dependency). |
 | Writing and images (2026-11-19) | Apple Intelligence (`FoundationModels`, on device) for rewrites and dictation polish; Vision for text in images and background removal. |
 
 ---

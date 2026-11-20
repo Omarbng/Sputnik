@@ -538,6 +538,41 @@ All four ideas from the guide Claude wrote him, each with a switch (or an Off ch
   found"); a 0.1 s right-⌥ tap doesn't listen, a hold does, ⌥-click cancels with nothing typed;
   the Shortcuts window renders in dark and light. Test rows removed by id; everyday build back.
 
+## Sputnik: anyone's languages, first-launch setup, rename (2026-11-20)
+Omar: name **Sputnik**, **free signing**, open source "you decide" (Claude: public, MIT; it's
+shared mostly with office colleagues), "Start" on the setup with language choice.
+- **Languages:** `TranslationLanguage` is now any of Apple's 20 on-device translation languages
+  (Arabic, Chinese Simplified/Traditional, Dutch, English, French, German, Hindi, Indonesian,
+  Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian,
+  Vietnamese), checked against `LanguageAvailability().supportedLanguages` on this Mac.
+  `LanguageSetup` (main, others, target, spoken ≤ 3) replaces "Translate English into" and the
+  dictation-language picker. Everything follows it: detection (`Script` + constrained
+  `NLLanguageRecognizer`), directions, reply memory, the language download card, dictation
+  (`SpeechLanguages.recogniser`: SpeechTranscriber, else DictationTranscriber, cached),
+  `TranscriptPicker` (same-alphabet rivals: the text's language), polish prompts for any
+  language, `sameAlphabet` checks, voice commands and lead-ins naming any language in English,
+  natively ("Deutsch") or in Russian ("на немецкий", "по-испански").
+- **Apple pairs:** most pairs translate directly (ru→fr was already installed here); a pair Apple
+  doesn't support goes through English. Downloads cover main ↔ each other language.
+- **Migration:** on first launch, a Mac with ClipDock settings gets `LanguageSetup.migrated`
+  (Omar: English; Russian target, French; speaks English and Russian) and skips the setup.
+- **Setup window** ("Welcome to Sputnik", `SetupWindowController`): Welcome → Your languages →
+  Three permissions (live status; buttons open the existing cards or the mic prompt) → Ready
+  (translation and speech downloads, four keys, Show All Shortcuts). Closing it early counts as
+  done. Settings → General → Run Setup Again… reopens it.
+- **Settings:** Translation → "Your languages" (I write in, others with remove, Add a Language,
+  "Translate X into"); Dictation → "Languages you speak" (switch per language, Apple download,
+  "Apple has no dictation for this language yet").
+- **Rename:** visible strings, `Sputnik.app`, executable `Sputnik`, version 0.2.0. Kept: bundle
+  ID `com.omar.clipdock` (permissions, settings), `~/Library/Application Support/ClipDock`,
+  Keychain service, log subsystem, internal pasteboard type, debug notification names, module
+  names. `run.sh` removes the old `ClipDock.app` when installing.
+- Unit tests: `LanguageSetupTests` (migration, suggestion, normalising, catalog, detection for
+  German/Spanish/Japanese/Korean/Arabic/Ukrainian, voice commands and lead-ins in any language,
+  same-alphabet picking, polish prompts). 169 tests in 40 suites pass.
+- Not covered yet: native-language lead-ins other than English and Russian ("auf Englisch"),
+  filler words outside English and Russian, region choice for dictation (English is en-US).
+
 ## Known issues
 - **macOS emptied `~/Library/Caches` (the build cache and SwiftPM's repository cache) by
   2026-11-18.** On a slow connection (~30 KB/s that day) SwiftPM's full clone of GRDB hung.
